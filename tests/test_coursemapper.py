@@ -1,4 +1,5 @@
 import unittest
+import urllib.error
 
 from coursemapper import (
     Coordinate,
@@ -8,7 +9,7 @@ from coursemapper import (
     build_course_map,
     map_course,
 )
-from coursemapper.geo import centroid, distance_m
+from coursemapper.geo import centroid, distance_m, point_in_rings
 
 # Offsets in degrees; at this latitude 0.001 deg lat is ~111 m.
 LAT, LON = 36.5680, -121.9500
@@ -67,6 +68,13 @@ class GeoTest(unittest.TestCase):
     def test_centroid_single_point(self):
         self.assertEqual(centroid([Coordinate(1, 2)]), Coordinate(1, 2))
 
+    def test_point_in_rings_with_hole(self):
+        outer = [Coordinate(p["lat"], p["lon"]) for p in square(LAT, LON, half=0.01)]
+        inner = [Coordinate(p["lat"], p["lon"]) for p in square(LAT, LON, half=0.001)]
+        self.assertTrue(point_in_rings(Coordinate(LAT + 0.005, LON), [outer, inner]))
+        self.assertFalse(point_in_rings(Coordinate(LAT, LON), [outer, inner]))
+        self.assertFalse(point_in_rings(Coordinate(LAT + 0.02, LON), [outer, inner]))
+
 
 class BuildCourseMapTest(unittest.TestCase):
     def setUp(self):
@@ -106,6 +114,32 @@ class BuildCourseMapTest(unittest.TestCase):
         self.assertEqual(course.holes[0].green_center, Coordinate(*end_a))
         self.assertEqual(course.holes[1].green_center, Coordinate(*end_b))
         self.assertEqual(course.holes[0].green_source, "green")
+
+    def test_hole_length(self):
+        self.assertAlmostEqual(self.course.holes[0].length_m, 333.6, delta=1)
+
+    def test_tee_ref_picks_matching_hole(self):
+        # Two holes start near the tee; the closer one has the wrong number.
+        elements = [
+            way(1, {"golf": "hole", "ref": "1"}, line((LAT, LON), (LAT + 0.003, LON))),
+            way(2, {"golf": "hole", "ref": "2"}, line((LAT, LON + 0.0006), (LAT - 0.003, LON + 0.0006))),
+            {"type": "node", "id": 3, "lat": LAT, "lon": LON + 0.0001, "tags": {"golf": "tee", "ref": "2"}},
+        ]
+        h1, h2 = build_course_map(COURSE, elements).holes
+        self.assertEqual(h1.tees[0].source, "hole_line")
+        self.assertEqual(h2.tees[0].location, Coordinate(LAT, LON + 0.0001))
+
+    def test_tee_beyond_hole_length_goes_to_other_hole(self):
+        # The tee is 55 m behind hole 1's back tee, so it cannot be a hole 1
+        # tee; it is a forward tee for hole 2, whose line starts 70 m away.
+        elements = [
+            way(1, {"golf": "hole", "ref": "1"}, line((LAT, LON), (LAT + 0.003, LON))),
+            way(2, {"golf": "hole", "ref": "2"}, line((LAT - 0.0005, LON + 0.0008), (LAT - 0.0005, LON - 0.004))),
+            {"type": "node", "id": 3, "lat": LAT - 0.0005, "lon": LON, "tags": {"golf": "tee"}},
+        ]
+        h1, h2 = build_course_map(COURSE, elements).holes
+        self.assertEqual(h1.tees[0].source, "hole_line")
+        self.assertEqual([t.source for t in h2.tees], ["tee"])
 
     def test_relation_green(self):
         elements = [
@@ -183,6 +217,40 @@ class MapCourseTest(unittest.TestCase):
         # The name match wins over the closer, differently named course.
         self.assertEqual((course.name, course.osm_type, course.osm_id), ("Test Links", "relation", 8))
         self.assertEqual(len(course.holes), 2)
+
+    def test_falls_back_to_osm_api_when_overpass_unreachable(self):
+        def node(id_, lat, lon, tags=None):
+            return {"type": "node", "id": id_, "lat": lat, "lon": lon, "tags": tags or {}}
+
+        corners = [(LAT - 0.005, LON - 0.005), (LAT - 0.005, LON + 0.005), (LAT + 0.005, LON + 0.005), (LAT + 0.005, LON - 0.005)]
+        boundary_nodes = [node(100 + i, a, b) for i, (a, b) in enumerate(corners)]
+        boundary = {"type": "way", "id": 50, "nodes": [100, 101, 102, 103, 100], "tags": {"leisure": "golf_course"}}
+        map_elements = boundary_nodes + [
+            node(1, *HOLE1_TEE),
+            node(2, *HOLE1_GREEN),
+            {"type": "way", "id": 10, "nodes": [1, 2], "tags": {"golf": "hole", "ref": "1"}},
+            node(3, LAT, LON, {"golf": "tee", "tee": "blue"}),
+            # Another course's hole outside the boundary is excluded.
+            node(4, LAT + 0.02, LON),
+            node(5, LAT + 0.023, LON),
+            {"type": "way", "id": 11, "nodes": [4, 5], "tags": {"golf": "hole", "ref": "1"}},
+        ]
+        urls = []
+
+        def fetch(url, data):
+            urls.append(url)
+            if data is not None:
+                raise urllib.error.URLError("connection reset")
+            if url.endswith("/way/50/full.json"):
+                return {"elements": boundary_nodes + [boundary]}
+            if "/map.json?bbox=" in url:
+                return {"elements": map_elements}
+            return [{"category": "leisure", "type": "golf_course", "osm_type": "way", "osm_id": 50, "name": "T"}]
+
+        course = map_course("T", client=OSMClient(fetch_json=fetch))
+        self.assertEqual(len(course.holes), 1)
+        self.assertEqual(course.holes[0].tees[0].name, "blue")
+        self.assertIn("bbox=-121.9560000,36.5620000,-121.9440000,36.5740000", urls[-1])
 
     def test_not_found(self):
         fetch = FakeFetch(nominatim=[{"category": "amenity", "type": "cafe"}], overpass=None)

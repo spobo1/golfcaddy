@@ -6,7 +6,9 @@ Repository created via GitHub Copilot task
 Given a golf course name, `coursemapper` returns the GPS coordinates of every
 hole's tee boxes and the centre of its green, using OpenStreetMap data
 (Nominatim to find the course, Overpass for `golf=hole`, `golf=tee` and
-`golf=green` features). Standard library only; Python 3.10+.
+`golf=green` features). If Overpass can't be reached it falls back to the main
+OpenStreetMap API, which is meant for occasional, low-volume reads. Standard
+library only; Python 3.10+.
 
 ```sh
 python -m coursemapper "Pebble Beach Golf Links"
@@ -22,9 +24,15 @@ for hole in course.holes:
 
 How positions are worked out:
 
+- **Course**: the first Nominatim result that is a golf course. If the name
+  only matches something else (e.g. the clubhouse), the golf course within
+  2 km whose name matches, else the nearest one.
 - **Tee boxes**: each mapped `golf=tee` feature (its centroid) is assigned to
-  the hole whose line starts closest to it, within 150 m. Tees are sorted back
-  to front and include the straight-line distance to the green centre.
+  the hole whose line starts closest to it, within 150 m, or to the nearest
+  hole with the tee's `ref` number when it has one. Since hole lines start at
+  the back tee, a tee more than 25 m farther from the green than the hole is
+  long goes to the next-nearest hole instead. Tees are sorted back to front and
+  include the straight-line distance to the green centre.
 - **Green centre**: centroid of the `golf=green` polygon nearest the end of the
   hole line, within 75 m. Double greens shared by several holes use each hole
   line's end point instead.
@@ -32,6 +40,11 @@ How positions are worked out:
   line is used and the result is marked `source="hole_line"` /
   `green_source="hole_line"`.
 
-Results are only as good as the course's OpenStreetMap mapping.
+Each hole also reports `length_m`, its length along the mapped hole line.
+
+Results are only as good as the course's OpenStreetMap mapping. Holes of
+every course inside the boundary are returned, so a club with a separate short
+course inside the same boundary (e.g. Augusta National's Par 3 Course) returns
+two sets of hole numbers.
 
 Run the tests with `python -m unittest discover`.

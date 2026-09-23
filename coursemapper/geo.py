@@ -31,7 +31,7 @@ def centroid(points: Sequence[Coordinate]) -> Coordinate:
     if len(pts) > 1 and pts[0] == pts[-1]:
         pts = pts[:-1]
     if len(pts) < 3:
-        return _mean(pts)
+        return mean_point(pts)
 
     lat0 = sum(p.lat for p in pts) / len(pts)
     lon0 = sum(p.lon for p in pts) / len(pts)
@@ -45,14 +45,32 @@ def centroid(points: Sequence[Coordinate]) -> Coordinate:
         cx += (x1 + x2) * cross
         cy += (y1 + y2) * cross
     if abs(area2) < 1e-18:
-        return _mean(pts)
+        return mean_point(pts)
     cx /= 3 * area2
     cy /= 3 * area2
     return Coordinate(lat=lat0 + cy, lon=lon0 + cx / kx)
 
 
-def _mean(pts: Sequence[Coordinate]) -> Coordinate:
+def mean_point(pts: Sequence[Coordinate]) -> Coordinate:
+    """Average of the points."""
     return Coordinate(
         lat=sum(p.lat for p in pts) / len(pts),
         lon=sum(p.lon for p in pts) / len(pts),
     )
+
+
+def point_in_rings(point: Coordinate, rings: Sequence[Sequence[Coordinate]]) -> bool:
+    """Even-odd point-in-polygon test over a set of rings.
+
+    Works for multipolygons (inner rings cut holes) and does not require the
+    outer ring's member ways to be joined in order, because only the
+    parity of edge crossings matters.
+    """
+    inside = False
+    for ring in rings:
+        for a, b in zip(ring, ring[1:]):
+            if (a.lat > point.lat) != (b.lat > point.lat):
+                lon_at = a.lon + (point.lat - a.lat) * (b.lon - a.lon) / (b.lat - a.lat)
+                if point.lon < lon_at:
+                    inside = not inside
+    return inside

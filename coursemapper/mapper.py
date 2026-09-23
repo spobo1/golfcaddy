@@ -22,6 +22,10 @@ from .osm import CourseRef
 TEE_MATCH_RADIUS_M = 150.0
 GREEN_MATCH_RADIUS_M = 75.0
 
+# Hole lines are drawn from the back tee, so a tee farther than this beyond
+# the line's length from the green belongs to some other hole.
+TEE_OVERHANG_M = 25.0
+
 
 @dataclass
 class _Feature:
@@ -35,6 +39,7 @@ class _HoleLine:
     tags: dict
     start: Coordinate
     end: Coordinate
+    length_m: float
 
 
 def build_course_map(course: CourseRef, elements: list[dict]) -> CourseMap:
@@ -47,7 +52,8 @@ def build_course_map(course: CourseRef, elements: list[dict]) -> CourseMap:
         if kind == "hole":
             pts = _points(el)
             if len(pts) >= 2:
-                hole_lines.append(_HoleLine(el["tags"], pts[0], pts[-1]))
+                length = sum(distance_m(a, b) for a, b in zip(pts, pts[1:]))
+                hole_lines.append(_HoleLine(el["tags"], pts[0], pts[-1], length))
         elif kind in ("tee", "green"):
             pts = _points(el)
             if pts:
@@ -76,6 +82,7 @@ def build_course_map(course: CourseRef, elements: list[dict]) -> CourseMap:
                 par=_int(line.tags.get("par")),
                 handicap=_int(line.tags.get("handicap")),
                 name=line.tags.get("name"),
+                length_m=round(line.length_m, 1),
                 green_source="green" if green is not None else "hole_line",
             )
         )
@@ -85,12 +92,24 @@ def build_course_map(course: CourseRef, elements: list[dict]) -> CourseMap:
 
 
 def _assign_tees(lines: list[_HoleLine], tees: list[_Feature]) -> dict[int, list[_Feature]]:
-    """Give each tee box to the hole whose line starts closest to it."""
+    """Give each tee box to the hole whose line starts closest to it.
+
+    A tee tagged with a hole number (``ref``) goes to the nearest hole with
+    that number. A tee is skipped for any hole it could not belong to: one
+    whose green is farther from the tee than the hole is long.
+    """
     result: dict[int, list[_Feature]] = {}
     for tee in tees:
-        best = _nearest(tee.center, [line.start for line in lines], TEE_MATCH_RADIUS_M)
-        if best is not None:
-            result.setdefault(best, []).append(tee)
+        candidates = sorted(
+            (i for i, line in enumerate(lines) if distance_m(tee.center, line.start) <= TEE_MATCH_RADIUS_M),
+            key=lambda i: distance_m(tee.center, lines[i].start),
+        )
+        ref = _int(tee.tags.get("ref"))
+        numbered = [i for i in candidates if _int(lines[i].tags.get("ref")) == ref]
+        for i in numbered or candidates:
+            if distance_m(tee.center, lines[i].end) <= lines[i].length_m + TEE_OVERHANG_M:
+                result.setdefault(i, []).append(tee)
+                break
     return result
 
 

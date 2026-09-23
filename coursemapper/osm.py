@@ -10,12 +10,19 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Callable, Optional
 
+from . import osmapi
+from .geo import centroid, mean_point
+
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 USER_AGENT = "golfcaddy-coursemapper/0.1 (https://github.com/spobo1/golfcaddy)"
 
 # Overpass area ids are derived from the OSM id of the way/relation.
 _AREA_OFFSET = {"way": 2_400_000_000, "relation": 3_600_000_000}
+
+# Errors meaning a server could not be reached (or kept failing), as opposed
+# to a bad response.
+NETWORK_ERRORS = (urllib.error.URLError, ConnectionError, TimeoutError)
 
 # When the name search finds no golf course (e.g. it only matches the
 # clubhouse), look for courses within this distance of the best match.
@@ -64,10 +71,12 @@ class OSMClient:
         fetch_json: FetchJson = http_fetch_json,
         nominatim_url: str = NOMINATIM_URL,
         overpass_url: str = OVERPASS_URL,
+        api_url: str = osmapi.API_URL,
     ):
         self._fetch = fetch_json
         self._nominatim_url = nominatim_url
         self._overpass_url = overpass_url
+        self._api_url = api_url
 
     def find_course(self, name: str) -> CourseRef:
         """Resolve a course name to its OSM golf_course way/relation."""
@@ -100,7 +109,10 @@ class OSMClient:
 );
 out tags center;
 """
-        elements = self._fetch(self._overpass_url, {"data": query}).get("elements", [])
+        try:
+            elements = self._overpass(query)
+        except NETWORK_ERRORS:
+            elements = self._api_courses_near(lat, lon)
         if not elements:
             return None
         wanted = _normalise(name)
@@ -132,9 +144,42 @@ area({area_id})->.course;
 );
 out tags geom;
 """
-        result = self._fetch(self._overpass_url, {"data": query})
-        return result.get("elements", [])
+        try:
+            return self._overpass(query)
+        except NETWORK_ERRORS:
+            return self._api_features(course)
+
+    def _overpass(self, query: str) -> list[dict]:
+        return self._fetch(self._overpass_url, {"data": query}).get("elements", [])
+
+    def _api_map(self, box: tuple[float, float, float, float]) -> list[dict]:
+        bbox_param = ",".join(f"{v:.7f}" for v in box)
+        result = self._fetch(f"{self._api_url}/map.json?bbox={bbox_param}", None)
+        return osmapi.attach_geometry(result.get("elements", []))
+
+    def _api_features(self, course: CourseRef) -> list[dict]:
+        """Fallback for fetch_features using the main OSM API."""
+        full = self._fetch(f"{self._api_url}/{course.osm_type}/{course.osm_id}/full.json", None)
+        elements = osmapi.attach_geometry(full.get("elements", []))
+        boundary = next(e for e in elements if e["type"] == course.osm_type and e["id"] == course.osm_id)
+        rings = osmapi.boundary_rings(boundary)
+        box = osmapi.bbox((p for ring in rings for p in ring), pad=osmapi.BBOX_PADDING_DEG)
+        return osmapi.golf_features_inside(self._api_map(box), rings)
+
+    def _api_courses_near(self, lat: float, lon: float) -> list[dict]:
+        """Fallback for _find_course_near: golf courses around a point, with centres."""
+        pad = NEARBY_COURSE_RADIUS_M / 111_000
+        courses = []
+        for e in self._api_map((lon - pad, lat - pad, lon + pad, lat + pad)):
+            if e["type"] in _AREA_OFFSET and e.get("tags", {}).get("leisure") == "golf_course":
+                points = osmapi.element_points(e, roles={"outer"})
+                if points:
+                    # Relation member ways are not joined into rings, so average them.
+                    c = centroid(points) if e["type"] == "way" else mean_point(points)
+                    courses.append(dict(e, center={"lat": c.lat, "lon": c.lon}))
+        return courses
 
 
 def _normalise(name: str) -> str:
     return " ".join(name.lower().split())
+

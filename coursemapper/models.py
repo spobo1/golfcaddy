@@ -32,6 +32,8 @@ class Hole:
     par: Optional[int] = None
     handicap: Optional[int] = None
     name: Optional[str] = None
+    # Length along the mapped hole line (tee to green, following doglegs).
+    length_m: Optional[float] = None
     # "green" when taken from a mapped green polygon, "hole_line" when
     # inferred from the end of the hole's centre line.
     green_source: str = "green"
