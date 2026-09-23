@@ -26,7 +26,8 @@ How positions are worked out:
 
 - **Course**: the first Nominatim result that is a golf course. If the name
   only matches something else (e.g. the clubhouse), the golf course within
-  2 km whose name matches, else the nearest one.
+  2 km that shares the most distinctive name words (ignoring words like
+  "golf", "links", "course" and "club"), else the nearest one.
 - **Tee boxes**: each mapped `golf=tee` feature (its centroid) is assigned to
   the hole whose line starts closest to it, within 150 m, or to the nearest
   hole with the tee's `ref` number when it has one. Since hole lines start at

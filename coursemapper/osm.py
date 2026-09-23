@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -27,6 +28,9 @@ NETWORK_ERRORS = (urllib.error.URLError, ConnectionError, TimeoutError)
 # When the name search finds no golf course (e.g. it only matches the
 # clubhouse), look for courses within this distance of the best match.
 NEARBY_COURSE_RADIUS_M = 2000
+
+# Box sizes tried, in turn, when searching near a point via the OSM API.
+API_NEARBY_RADII_M = (500, 1000, NEARBY_COURSE_RADIUS_M)
 
 _RETRY_STATUS = {429, 502, 503, 504}
 _RETRY_DELAYS_S = (2, 4, 8)
@@ -115,14 +119,14 @@ out tags center;
             elements = self._api_courses_near(lat, lon)
         if not elements:
             return None
-        wanted = _normalise(name)
+        wanted = _name_words(name)
 
         def rank(el: dict) -> tuple:
-            course_name = _normalise(el.get("tags", {}).get("name", ""))
+            common = wanted & _name_words(el.get("tags", {}).get("name", ""))
             center = el.get("center", {})
             dist2 = (center.get("lat", lat) - lat) ** 2 + (center.get("lon", lon) - lon) ** 2
-            name_match = bool(course_name) and (course_name in wanted or wanted in course_name)
-            return (not name_match, dist2)
+            # Most shared distinctive words first, then nearest.
+            return (-len(common), dist2)
 
         best = min(elements, key=rank)
         return CourseRef(
@@ -167,19 +171,37 @@ out tags geom;
         return osmapi.golf_features_inside(self._api_map(box), rings)
 
     def _api_courses_near(self, lat: float, lon: float) -> list[dict]:
-        """Fallback for _find_course_near: golf courses around a point, with centres."""
-        pad = NEARBY_COURSE_RADIUS_M / 111_000
-        courses = []
-        for e in self._api_map((lon - pad, lat - pad, lon + pad, lat + pad)):
-            if e["type"] in _AREA_OFFSET and e.get("tags", {}).get("leisure") == "golf_course":
-                points = osmapi.element_points(e, roles={"outer"})
-                if points:
-                    # Relation member ways are not joined into rings, so average them.
-                    c = centroid(points) if e["type"] == "way" else mean_point(points)
-                    courses.append(dict(e, center={"lat": c.lat, "lon": c.lon}))
-        return courses
+        """Fallback for _find_course_near: golf courses around a point, with centres.
+
+        The API caps how many nodes one request returns, so start with a small
+        box (a clubhouse is usually beside its course) and widen it only while
+        nothing is found and the API accepts the size.
+        """
+        for radius_m in API_NEARBY_RADII_M:
+            pad = radius_m / 111_000
+            try:
+                elements = self._api_map((lon - pad, lat - pad, lon + pad, lat + pad))
+            except urllib.error.HTTPError as e:
+                if e.code == 400:  # too many nodes in the box
+                    break
+                raise
+            courses = []
+            for e in elements:
+                if e["type"] in _AREA_OFFSET and e.get("tags", {}).get("leisure") == "golf_course":
+                    points = osmapi.element_points(e, roles={"outer"})
+                    if points:
+                        # Relation member ways are not joined into rings, so average them.
+                        c = centroid(points) if e["type"] == "way" else mean_point(points)
+                        courses.append(dict(e, center={"lat": c.lat, "lon": c.lon}))
+            if courses:
+                return courses
+        return []
 
 
-def _normalise(name: str) -> str:
-    return " ".join(name.lower().split())
+# Words too common in course names to tell courses apart.
+_GENERIC_NAME_WORDS = {"golf", "links", "course", "club", "country", "the", "gc", "cc", "and", "&", "of"}
 
+
+def _name_words(name: str) -> set[str]:
+    words = re.findall(r"[\w&]+", name.lower())
+    return {w for w in words if w not in _GENERIC_NAME_WORDS}

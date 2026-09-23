@@ -198,7 +198,7 @@ class MapCourseTest(unittest.TestCase):
                 {
                     "type": "relation",
                     "id": 8,
-                    "tags": {"name": "Test Links"},
+                    "tags": {"name": "The Test Golf Course"},
                     "center": {"lat": LAT + 0.01, "lon": LON},
                 },
             ]
@@ -214,8 +214,8 @@ class MapCourseTest(unittest.TestCase):
         overpass = iter([nearby, {"elements": ELEMENTS}])
         client = OSMClient(fetch_json=lambda url, data: next(overpass) if data else [clubhouse])
         course = map_course("Test Links", client=client)
-        # The name match wins over the closer, differently named course.
-        self.assertEqual((course.name, course.osm_type, course.osm_id), ("Test Links", "relation", 8))
+        # The name match (ignoring generic words) wins over the closer course.
+        self.assertEqual((course.name, course.osm_type, course.osm_id), ("The Test Golf Course", "relation", 8))
         self.assertEqual(len(course.holes), 2)
 
     def test_falls_back_to_osm_api_when_overpass_unreachable(self):
