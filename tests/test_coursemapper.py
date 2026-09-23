@@ -157,6 +157,33 @@ class MapCourseTest(unittest.TestCase):
         overpass_query = fetch.calls[1][1]["data"]
         self.assertIn("area(3600000042)", overpass_query)
 
+    def test_falls_back_to_course_near_clubhouse(self):
+        nearby = {
+            "elements": [
+                {"type": "way", "id": 7, "tags": {"name": "Other Course"}, "center": {"lat": LAT, "lon": LON}},
+                {
+                    "type": "relation",
+                    "id": 8,
+                    "tags": {"name": "Test Links"},
+                    "center": {"lat": LAT + 0.01, "lon": LON},
+                },
+            ]
+        }
+        clubhouse = {
+            "category": "amenity",
+            "type": "restaurant",
+            "osm_type": "way",
+            "osm_id": 1,
+            "lat": str(LAT),
+            "lon": str(LON),
+        }
+        overpass = iter([nearby, {"elements": ELEMENTS}])
+        client = OSMClient(fetch_json=lambda url, data: next(overpass) if data else [clubhouse])
+        course = map_course("Test Links", client=client)
+        # The name match wins over the closer, differently named course.
+        self.assertEqual((course.name, course.osm_type, course.osm_id), ("Test Links", "relation", 8))
+        self.assertEqual(len(course.holes), 2)
+
     def test_not_found(self):
         fetch = FakeFetch(nominatim=[{"category": "amenity", "type": "cafe"}], overpass=None)
         with self.assertRaises(CourseNotFoundError):

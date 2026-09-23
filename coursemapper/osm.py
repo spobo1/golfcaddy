@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
@@ -14,6 +16,13 @@ USER_AGENT = "golfcaddy-coursemapper/0.1 (https://github.com/spobo1/golfcaddy)"
 
 # Overpass area ids are derived from the OSM id of the way/relation.
 _AREA_OFFSET = {"way": 2_400_000_000, "relation": 3_600_000_000}
+
+# When the name search finds no golf course (e.g. it only matches the
+# clubhouse), look for courses within this distance of the best match.
+NEARBY_COURSE_RADIUS_M = 2000
+
+_RETRY_STATUS = {429, 502, 503, 504}
+_RETRY_DELAYS_S = (2, 4, 8)
 
 # (url, POST form data or None) -> parsed JSON
 FetchJson = Callable[[str, Optional[dict]], object]
@@ -31,10 +40,22 @@ class CourseRef:
 
 
 def http_fetch_json(url: str, data: Optional[dict] = None, timeout: float = 90) -> object:
+    """Fetch JSON, retrying on rate limits, server overload and dropped connections."""
     body = urllib.parse.urlencode(data).encode() if data is not None else None
     req = urllib.request.Request(url, data=body, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.load(resp)
+    for attempt, delay in enumerate((*_RETRY_DELAYS_S, None)):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return json.load(resp)
+        except urllib.error.HTTPError as e:
+            if delay is None or e.code not in _RETRY_STATUS:
+                raise
+            retry_after = e.headers.get("Retry-After", "")
+            delay = int(retry_after) if retry_after.isdigit() else delay
+        except (urllib.error.URLError, ConnectionError, TimeoutError):
+            if delay is None:
+                raise
+        time.sleep(delay)
 
 
 class OSMClient:
@@ -63,7 +84,40 @@ class OSMClient:
                     osm_type=r["osm_type"],
                     osm_id=int(r["osm_id"]),
                 )
+        if results and "lat" in results[0]:
+            course = self._find_course_near(name, float(results[0]["lat"]), float(results[0]["lon"]))
+            if course is not None:
+                return course
         raise CourseNotFoundError(f"No golf course found in OpenStreetMap for {name!r}")
+
+    def _find_course_near(self, name: str, lat: float, lon: float) -> Optional[CourseRef]:
+        """Pick the golf course near a point, preferring one whose name matches."""
+        query = f"""
+[out:json][timeout:60];
+(
+  way["leisure"="golf_course"](around:{NEARBY_COURSE_RADIUS_M},{lat},{lon});
+  relation["leisure"="golf_course"](around:{NEARBY_COURSE_RADIUS_M},{lat},{lon});
+);
+out tags center;
+"""
+        elements = self._fetch(self._overpass_url, {"data": query}).get("elements", [])
+        if not elements:
+            return None
+        wanted = _normalise(name)
+
+        def rank(el: dict) -> tuple:
+            course_name = _normalise(el.get("tags", {}).get("name", ""))
+            center = el.get("center", {})
+            dist2 = (center.get("lat", lat) - lat) ** 2 + (center.get("lon", lon) - lon) ** 2
+            name_match = bool(course_name) and (course_name in wanted or wanted in course_name)
+            return (not name_match, dist2)
+
+        best = min(elements, key=rank)
+        return CourseRef(
+            name=best.get("tags", {}).get("name") or name,
+            osm_type=best["type"],
+            osm_id=int(best["id"]),
+        )
 
     def fetch_features(self, course: CourseRef) -> list[dict]:
         """Fetch golf holes, tees and greens inside the course boundary."""
@@ -80,3 +134,7 @@ out tags geom;
 """
         result = self._fetch(self._overpass_url, {"data": query})
         return result.get("elements", [])
+
+
+def _normalise(name: str) -> str:
+    return " ".join(name.lower().split())
