@@ -39,6 +39,10 @@ How positions are worked out:
 - **Green centre**: centroid of the `golf=green` polygon nearest the end of the
   hole line, within 75 m. Double greens shared by several holes use each hole
   line's end point instead.
+- **Front and back of the green**: where the line of approach through the
+  green centre crosses the green's outline. The approach direction comes from
+  the last 100 m of the hole line, so doglegs are measured the way the green
+  is actually played. Each tee also gets its distance to the front and back.
 - **Hazards**: bunkers (`golf=bunker`), water hazards (`golf=water_hazard`,
   `golf=lateral_water_hazard`) and other water (`natural=water`, unless it
   duplicates a mapped water hazard). OpenStreetMap doesn't say which hole a

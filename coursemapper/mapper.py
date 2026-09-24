@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-from .geo import centroid, distance_m
+from .geo import LocalProjection, centroid, chord_through, distance_m, point_back_along
 from .hazards import extract_hazards, hazards_for_holes
 from .models import Coordinate, CourseMap, Hole, TeeBox
 from .osm import CourseRef
@@ -22,6 +22,10 @@ from .osm import CourseRef
 # considered part of that hole.
 TEE_MATCH_RADIUS_M = 150.0
 GREEN_MATCH_RADIUS_M = 75.0
+
+# Front and back of the green are measured along the line from this far back
+# on the hole line, so a dogleg's approach direction is used, not the tee's.
+APPROACH_M = 100.0
 
 # A tee more than this beyond the hole line's length from the green is
 # assumed to belong to another nearby hole if one fits better.
@@ -33,6 +37,7 @@ class _Feature:
     osm_key: str
     tags: dict
     center: Coordinate
+    points: list[Coordinate]
 
 
 @dataclass
@@ -59,7 +64,7 @@ def build_course_map(course: CourseRef, elements: list[dict]) -> CourseMap:
         elif kind in ("tee", "green"):
             pts = _points(el)
             if pts:
-                feature = _Feature(f"{el['type']}/{el['id']}", el.get("tags", {}), centroid(pts))
+                feature = _Feature(f"{el['type']}/{el['id']}", el.get("tags", {}), centroid(pts), pts)
                 (tees if kind == "tee" else greens).append(feature)
 
     tees_by_hole = _assign_tees(hole_lines, tees)
@@ -67,13 +72,17 @@ def build_course_map(course: CourseRef, elements: list[dict]) -> CourseMap:
 
     holes = []
     for i, line in enumerate(hole_lines):
-        green = green_by_hole.get(i)
+        green, outline = green_by_hole.get(i, (None, None))
         green_center = green if green is not None else line.end
+        front, back = _front_and_back(line, green_center, outline)
         tee_boxes = [
             TeeBox(location=t.center, name=_tee_name(t.tags)) for t in tees_by_hole.get(i, [])
         ] or [TeeBox(location=line.start, source="hole_line")]
         for tee in tee_boxes:
             tee.distance_to_green_m = round(distance_m(tee.location, green_center), 1)
+            if front is not None:
+                tee.distance_to_green_front_m = round(distance_m(tee.location, front), 1)
+                tee.distance_to_green_back_m = round(distance_m(tee.location, back), 1)
         # Longest (back) tees first.
         tee_boxes.sort(key=lambda t: -(t.distance_to_green_m or 0))
         holes.append(
@@ -86,6 +95,8 @@ def build_course_map(course: CourseRef, elements: list[dict]) -> CourseMap:
                 name=line.tags.get("name"),
                 length_m=round(line.length_m, 1),
                 green_source="green" if green is not None else "hole_line",
+                green_front=front,
+                green_back=back,
             )
         )
 
@@ -128,8 +139,10 @@ def _assign_tees(lines: list[_HoleLine], tees: list[_Feature]) -> dict[int, list
     return result
 
 
-def _assign_greens(lines: list[_HoleLine], greens: list[_Feature]) -> dict[int, Coordinate]:
-    """Find each hole's green centre.
+def _assign_greens(
+    lines: list[_HoleLine], greens: list[_Feature]
+) -> dict[int, tuple[Coordinate, list[Coordinate]]]:
+    """Find each hole's green centre and the green's outline.
 
     A green shared by several holes (a double green) has a centroid that is
     not the centre of any one hole's target, so for those we use each hole
@@ -145,9 +158,26 @@ def _assign_greens(lines: list[_HoleLine], greens: list[_Feature]) -> dict[int, 
     for green in chosen.values():
         users[green.osm_key] = users.get(green.osm_key, 0) + 1
     return {
-        i: (lines[i].end if users[green.osm_key] > 1 else green.center)
+        i: (lines[i].end if users[green.osm_key] > 1 else green.center, green.points)
         for i, green in chosen.items()
     }
+
+
+def _front_and_back(
+    line: _HoleLine, center: Coordinate, outline: Optional[list[Coordinate]]
+) -> tuple[Optional[Coordinate], Optional[Coordinate]]:
+    """Where the line of approach through the green centre enters and leaves the green."""
+    if not outline or len(outline) < 3:
+        return None, None
+    proj = LocalProjection(center)
+    line_xy = [proj.xy(p) for p in line.points]
+    ring = [proj.xy(p) for p in outline]
+    if ring[0] != ring[-1]:
+        ring.append(ring[0])
+    chord = chord_through(ring, point_back_along(line_xy, APPROACH_M), proj.xy(center))
+    if chord is None:
+        return None, None
+    return proj.coord(chord[0]), proj.coord(chord[1])
 
 
 def _nearest(target: Coordinate, candidates: list[Coordinate], max_m: float) -> Optional[int]:

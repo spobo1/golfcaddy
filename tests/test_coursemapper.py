@@ -95,6 +95,36 @@ class BuildCourseMapTest(unittest.TestCase):
         self.assertAlmostEqual(h1.green_center.lat, HOLE1_GREEN[0] + 0.00005, places=6)
         self.assertAlmostEqual(h1.tees[0].distance_to_green_m, 339, delta=2)
 
+    def test_green_front_and_back(self):
+        h1, h2 = self.course.holes
+        green_lat = HOLE1_GREEN[0] + 0.00005
+        self.assertAlmostEqual(h1.green_front.lat, green_lat - 0.0001, places=6)
+        self.assertAlmostEqual(h1.green_back.lat, green_lat + 0.0001, places=6)
+        self.assertAlmostEqual(h1.green_front.lon, LON, places=6)
+        back_tee = h1.tees[0]
+        self.assertAlmostEqual(back_tee.distance_to_green_front_m, back_tee.distance_to_green_m - 11.1, delta=0.2)
+        self.assertAlmostEqual(back_tee.distance_to_green_back_m, back_tee.distance_to_green_m + 11.1, delta=0.2)
+        # No green outline mapped for hole 2.
+        self.assertIsNone(h2.green_front)
+        self.assertIsNone(h2.tees[0].distance_to_green_front_m)
+
+    def test_green_depth_follows_dogleg_approach(self):
+        # Dogleg: east from the tee, then north into a wide, shallow green.
+        # Measured from the south the green is ~22 m deep; from the tee
+        # (west) it would be ~71 m wide.
+        corner = (LAT, LON + 0.002)
+        end = (LAT + 0.002, LON + 0.002)
+        elements = [
+            way(1, {"golf": "hole", "ref": "1"}, line((LAT, LON), corner, end)),
+            way(2, {"golf": "green"}, [
+                {"lat": end[0] + dlat, "lon": end[1] + dlon}
+                for dlat, dlon in ((-0.0001, -0.0004), (-0.0001, 0.0004), (0.0001, 0.0004), (0.0001, -0.0004), (-0.0001, -0.0004))
+            ]),
+        ]
+        (hole,) = build_course_map(COURSE, elements).holes
+        self.assertAlmostEqual(distance_m(hole.green_front, hole.green_back), 22.2, delta=0.5)
+        self.assertAlmostEqual(hole.green_front.lon, end[1], places=6)
+
     def test_falls_back_to_hole_line(self):
         h2 = self.course.holes[1]
         self.assertEqual(len(h2.tees), 1)

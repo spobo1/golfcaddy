@@ -19,6 +19,9 @@ class TeeBox:
     name: Optional[str] = None
     # Straight-line distance from this tee box to the centre of the green.
     distance_to_green_m: Optional[float] = None
+    # ...and to the front and back edges of the green, when known.
+    distance_to_green_front_m: Optional[float] = None
+    distance_to_green_back_m: Optional[float] = None
     # "tee" when taken from a mapped tee feature, "hole_line" when inferred
     # from the start of the hole's centre line.
     source: str = "tee"
@@ -54,6 +57,10 @@ class Hole:
     # "green" when taken from a mapped green polygon, "hole_line" when
     # inferred from the end of the hole's centre line.
     green_source: str = "green"
+    # Where the line of approach enters and leaves the green. None when the
+    # green's outline isn't mapped.
+    green_front: Optional[Coordinate] = None
+    green_back: Optional[Coordinate] = None
     # Bunkers and water in play on this hole, nearest to the tee first.
     hazards: list[Hazard] = field(default_factory=list)
 

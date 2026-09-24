@@ -90,6 +90,9 @@ class LocalProjection:
     def xy(self, c: Coordinate) -> tuple[float, float]:
         return ((c.lon - self._lon0) * self._kx, (c.lat - self._lat0) * self._ky)
 
+    def coord(self, p: tuple[float, float]) -> Coordinate:
+        return Coordinate(lat=self._lat0 + p[1] / self._ky, lon=self._lon0 + p[0] / self._kx)
+
 
 XY = tuple[float, float]
 
@@ -117,3 +120,46 @@ def segments_intersect(a: XY, b: XY, c: XY, d: XY) -> bool:
         return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
 
     return (orient(a, b, c) > 0) != (orient(a, b, d) > 0) and (orient(c, d, a) > 0) != (orient(c, d, b) > 0)
+
+
+def point_back_along(line: Sequence[XY], distance: float) -> XY:
+    """The point ``distance`` back from the end of a polyline (or its start)."""
+    remaining = distance
+    for a, b in zip(reversed(line[1:]), reversed(line[:-1])):
+        seg = math.hypot(b[0] - a[0], b[1] - a[1])
+        if seg >= remaining and seg > 0:
+            t = remaining / seg
+            return (a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1]))
+        remaining -= seg
+    return line[0]
+
+
+def chord_through(ring: Sequence[XY], approach: XY, center: XY) -> "tuple[XY, XY] | None":
+    """Where the line from ``approach`` through ``center`` crosses a polygon's edge.
+
+    Returns (front, back): the last crossing before the centre and the first
+    one after it. None if the centre is not inside the polygon.
+    """
+    dx, dy = center[0] - approach[0], center[1] - approach[1]
+    length = math.hypot(dx, dy)
+    if length == 0:
+        return None
+    ux, uy = dx / length, dy / length
+    hits = []
+    for a, b in zip(ring, ring[1:]):
+        ex, ey = b[0] - a[0], b[1] - a[1]
+        denom = ux * ey - uy * ex
+        if denom == 0:
+            continue
+        # Solve approach + t*u = a + s*e for t (along the approach) and s (along the edge).
+        wx, wy = a[0] - approach[0], a[1] - approach[1]
+        t = (wx * ey - wy * ex) / denom
+        s = (wx * uy - wy * ux) / denom
+        if 0 <= s <= 1:
+            hits.append(t)
+    before = [t for t in hits if t <= length]
+    after = [t for t in hits if t >= length]
+    if not before or not after:
+        return None
+    tf, tb = max(before), min(after)
+    return (approach[0] + tf * ux, approach[1] + tf * uy), (approach[0] + tb * ux, approach[1] + tb * uy)
