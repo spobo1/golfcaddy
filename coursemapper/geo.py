@@ -74,3 +74,46 @@ def point_in_rings(point: Coordinate, rings: Sequence[Sequence[Coordinate]]) -> 
                 if point.lon < lon_at:
                     inside = not inside
     return inside
+
+
+class LocalProjection:
+    """Flat x/y metres around an origin (x east, y north).
+
+    Accurate to well under a metre across a golf course.
+    """
+
+    def __init__(self, origin: Coordinate):
+        self._lat0, self._lon0 = origin.lat, origin.lon
+        self._ky = math.radians(EARTH_RADIUS_M)
+        self._kx = self._ky * math.cos(math.radians(origin.lat))
+
+    def xy(self, c: Coordinate) -> tuple[float, float]:
+        return ((c.lon - self._lon0) * self._kx, (c.lat - self._lat0) * self._ky)
+
+
+XY = tuple[float, float]
+
+
+def offset_from_polyline(p: XY, line: Sequence[XY]) -> float:
+    """Signed distance from a point to a polyline: positive left, negative right.
+
+    Left and right are as seen travelling along the line from its start.
+    """
+    best, best_abs = 0.0, math.inf
+    for a, b in zip(line, line[1:]):
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        seg2 = dx * dx + dy * dy
+        t = 0.0 if seg2 == 0 else max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / seg2))
+        qx, qy = a[0] + t * dx, a[1] + t * dy
+        d = math.hypot(p[0] - qx, p[1] - qy)
+        if d < best_abs:
+            cross = dx * (p[1] - a[1]) - dy * (p[0] - a[0])
+            best, best_abs = (d if cross >= 0 else -d), d
+    return best
+
+
+def segments_intersect(a: XY, b: XY, c: XY, d: XY) -> bool:
+    def orient(p, q, r):
+        return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+
+    return (orient(a, b, c) > 0) != (orient(a, b, d) > 0) and (orient(c, d, a) > 0) != (orient(c, d, b) > 0)

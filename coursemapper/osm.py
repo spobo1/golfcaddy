@@ -136,7 +136,7 @@ out tags center;
         )
 
     def fetch_features(self, course: CourseRef) -> list[dict]:
-        """Fetch golf holes, tees and greens inside the course boundary."""
+        """Fetch golf holes, tees, greens, bunkers and water inside the course boundary."""
         # map_to_area builds the area from the boundary itself; Overpass's
         # precomputed area ids (2400000000 + way id) can be missing.
         query = f"""
@@ -147,6 +147,8 @@ map_to_area->.course;
   way["golf"="hole"](area.course);
   nwr["golf"="tee"](area.course);
   nwr["golf"="green"](area.course);
+  nwr["golf"~"^(bunker|water_hazard|lateral_water_hazard)$"](area.course);
+  nwr["natural"="water"](area.course);
 );
 out tags geom;
 """

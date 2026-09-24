@@ -4,7 +4,7 @@ Repository created via GitHub Copilot task
 ## coursemapper
 
 Given a golf course name, `coursemapper` returns the GPS coordinates of every
-hole's tee boxes and the centre of its green, using OpenStreetMap data
+hole's tee boxes and the centre of its green, plus its bunkers and water, using OpenStreetMap data
 (Nominatim to find the course, Overpass for `golf=hole`, `golf=tee` and
 `golf=green` features). If Overpass can't be reached it falls back to the main
 OpenStreetMap API, which is meant for occasional, low-volume reads. Standard
@@ -39,6 +39,14 @@ How positions are worked out:
 - **Green centre**: centroid of the `golf=green` polygon nearest the end of the
   hole line, within 75 m. Double greens shared by several holes use each hole
   line's end point instead.
+- **Hazards**: bunkers (`golf=bunker`), water hazards (`golf=water_hazard`,
+  `golf=lateral_water_hazard`) and other water (`natural=water`, unless it
+  duplicates a mapped water hazard). OpenStreetMap doesn't say which hole a
+  hazard belongs to, so a bunker goes to the nearest hole whose line comes
+  within 50 m of it, and water goes to every hole that passes within 50 m.
+  Each hazard reports its side of the line of play (`left`, `right` or
+  `crossing`), the distance from the back tee to reach it and to carry it,
+  its distance to the green centre, and its outline.
 - If a course has no tee or green mapped for a hole, the start/end of the hole
   line is used and the result is marked `source="hole_line"` /
   `green_source="hole_line"`.

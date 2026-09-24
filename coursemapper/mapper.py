@@ -1,4 +1,4 @@
-"""Turn raw OpenStreetMap golf features into per-hole tee and green positions.
+"""Turn raw OpenStreetMap golf features into per-hole tees, greens and hazards.
 
 OpenStreetMap convention (https://wiki.openstreetmap.org/wiki/Tag:golf=hole):
 each hole is a way tagged ``golf=hole`` drawn from the tee to the green, with
@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from .geo import centroid, distance_m
+from .hazards import extract_hazards, hazards_for_holes
 from .models import Coordinate, CourseMap, Hole, TeeBox
 from .osm import CourseRef
 
@@ -40,6 +41,7 @@ class _HoleLine:
     start: Coordinate
     end: Coordinate
     length_m: float
+    points: list[Coordinate]
 
 
 def build_course_map(course: CourseRef, elements: list[dict]) -> CourseMap:
@@ -53,7 +55,7 @@ def build_course_map(course: CourseRef, elements: list[dict]) -> CourseMap:
             pts = _points(el)
             if len(pts) >= 2:
                 length = sum(distance_m(a, b) for a, b in zip(pts, pts[1:]))
-                hole_lines.append(_HoleLine(el["tags"], pts[0], pts[-1], length))
+                hole_lines.append(_HoleLine(el["tags"], pts[0], pts[-1], length, pts))
         elif kind in ("tee", "green"):
             pts = _points(el)
             if pts:
@@ -86,6 +88,15 @@ def build_course_map(course: CourseRef, elements: list[dict]) -> CourseMap:
                 green_source="green" if green is not None else "hole_line",
             )
         )
+
+    hazards = hazards_for_holes(
+        [line.points for line in hole_lines],
+        [hole.tees[0].location for hole in holes],
+        [hole.green_center for hole in holes],
+        extract_hazards(elements, _points),
+    )
+    for i, hole in enumerate(holes):
+        hole.hazards = hazards.get(i, [])
 
     holes.sort(key=lambda h: (h.number is None, h.number or 0))
     return CourseMap(name=course.name, osm_type=course.osm_type, osm_id=course.osm_id, holes=holes)

@@ -25,6 +25,23 @@ class TeeBox:
 
 
 @dataclass
+class Hazard:
+    # "bunker", "water" or "lateral_water".
+    kind: str
+    center: Coordinate
+    outline: list[Coordinate]
+    # "left" or "right" of the line of play (seen from the tee), or
+    # "crossing" when the hole line runs through it.
+    side: str
+    # Straight-line distances from the hole's back tee to the hazard's
+    # nearest edge (to reach it) and farthest edge (to carry it).
+    reach_from_back_tee_m: float
+    carry_from_back_tee_m: float
+    # From the hazard's centre to the centre of the green.
+    distance_to_green_m: float
+
+
+@dataclass
 class Hole:
     number: Optional[int]
     tees: list[TeeBox]
@@ -37,6 +54,8 @@ class Hole:
     # "green" when taken from a mapped green polygon, "hole_line" when
     # inferred from the end of the hole's centre line.
     green_source: str = "green"
+    # Bunkers and water in play on this hole, nearest to the tee first.
+    hazards: list[Hazard] = field(default_factory=list)
 
 
 @dataclass

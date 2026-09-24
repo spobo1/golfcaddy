@@ -170,6 +170,53 @@ class BuildCourseMapTest(unittest.TestCase):
         self.assertIn("lat", d["holes"][0]["green_center"])
 
 
+class HazardTest(unittest.TestCase):
+    # Hole 1 runs due north for ~333 m; hole 2 runs parallel 90 m to the east.
+    HOLE1 = way(1, {"golf": "hole", "ref": "1"}, line((LAT, LON), (LAT + 0.003, LON)))
+    HOLE2 = way(2, {"golf": "hole", "ref": "2"}, line((LAT, LON + 0.001), (LAT + 0.003, LON + 0.001)))
+
+    def hazards(self, *extra, holes=(HOLE1,)):
+        course = build_course_map(COURSE, [*holes, *extra])
+        return [h.hazards for h in course.holes]
+
+    def test_bunker_side_and_distances(self):
+        # 25 m right of the line (east when heading north), ~220 m out.
+        bunker = way(10, {"golf": "bunker"}, square(LAT + 0.002, LON + 0.0003))
+        (hazards,) = self.hazards(bunker)
+        (h,) = hazards
+        self.assertEqual((h.kind, h.side), ("bunker", "right"))
+        self.assertAlmostEqual(h.reach_from_back_tee_m, 213, delta=3)
+        self.assertAlmostEqual(h.carry_from_back_tee_m, 238, delta=3)
+        self.assertAlmostEqual(h.distance_to_green_m, 115, delta=3)
+
+    def test_cross_bunker_and_left_water_sorted_by_reach(self):
+        cross = way(10, {"golf": "bunker"}, square(LAT + 0.001, LON))
+        pond = way(11, {"natural": "water"}, square(LAT + 0.0005, LON - 0.0004))
+        (hazards,) = self.hazards(cross, pond)
+        self.assertEqual([(h.kind, h.side) for h in hazards], [("water", "left"), ("bunker", "crossing")])
+
+    def test_far_bunker_ignored(self):
+        far = way(10, {"golf": "bunker"}, square(LAT + 0.001, LON + 0.003))
+        self.assertEqual(self.hazards(far), [[]])
+
+    def test_bunker_goes_to_nearest_hole_only(self):
+        bunker = way(10, {"golf": "bunker"}, square(LAT + 0.001, LON + 0.0003))
+        h1, h2 = self.hazards(bunker, holes=(self.HOLE1, self.HOLE2))
+        self.assertEqual((len(h1), len(h2)), (1, 0))
+
+    def test_water_between_holes_counts_for_both(self):
+        pond = way(10, {"golf": "lateral_water_hazard"}, square(LAT + 0.001, LON + 0.0005, half=0.0002))
+        h1, h2 = self.hazards(pond, holes=(self.HOLE1, self.HOLE2))
+        self.assertEqual([(h.kind, h.side) for h in h1], [("lateral_water", "right")])
+        self.assertEqual([(h.kind, h.side) for h in h2], [("lateral_water", "left")])
+
+    def test_pond_mapped_twice_counts_once(self):
+        hazard = way(10, {"golf": "water_hazard"}, square(LAT + 0.001, LON - 0.0003))
+        water = way(11, {"natural": "water"}, square(LAT + 0.001, LON - 0.0003, half=0.00012))
+        (hazards,) = self.hazards(hazard, water)
+        self.assertEqual([h.kind for h in hazards], ["water"])
+
+
 class FakeFetch:
     def __init__(self, nominatim, overpass):
         self.nominatim, self.overpass = nominatim, overpass
