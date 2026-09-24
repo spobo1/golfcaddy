@@ -80,3 +80,42 @@ course inside the same boundary (e.g. Augusta National's Par 3 Course) returns
 two sets of hole numbers.
 
 Run the tests with `python -m unittest discover`.
+
+## clubtracker
+
+Keeps track of how far each player hits each club. Every shot is saved with
+optional launch monitor readings, averages are kept per club, and clubs a
+player hasn't hit yet get typical distances for their skill level. History is
+stored in SQLite (standard library); distances are in yards, angles in degrees.
+
+```python
+from clubtracker import ClubTracker, LaunchData
+
+tracker = ClubTracker("shots.db")          # or ClubTracker() for in-memory
+tracker.set_skill_level("ann", "intermediate")
+
+tracker.record_shot("ann", "7 iron", carry_yd=148, total_yd=153)
+tracker.record_shot(
+    "ann", "driver", carry_yd=232, total_yd=251,
+    launch=LaunchData(launch_angle_deg=13.1, ball_speed_mph=148, spin_rate_rpm=2750),
+)
+
+tracker.shots("ann", club="7i")            # history, newest first
+tracker.club_averages("ann")               # per-club averages, incl. launch data
+tracker.club_distance("ann", "7i")         # source="history": Ann's average
+tracker.club_distance("ann", "pw")         # source="estimate": typical intermediate PW
+tracker.bag("ann")                          # every club, longest first
+```
+
+- **Clubs**: driver, 3/5/7 woods, 3–5 hybrids, 3–9 irons and PW/GW/SW/LW.
+  Names like "7 iron", "7-Iron", "3 wood" or "sand wedge" are accepted.
+- **Shots** need a carry, a total, or both. Launch monitor readings
+  (`LaunchData`) are all optional: ball and club speed, smash factor, launch
+  angle and direction, spin rate and axis, attack angle, club path, face angle,
+  apex, descent angle and offline distance.
+- **Distances**: a club's distance is the player's average once they have a
+  shot with it. Otherwise it's an estimate from typical carries for their
+  skill level (`beginner`, `intermediate`, `advanced`, `expert`; players
+  without one set are treated as `intermediate`). When only carry or only
+  total is known, the other is worked out from typical roll for the club.
+- `delete_shot(id)` removes a shot entered by mistake.
