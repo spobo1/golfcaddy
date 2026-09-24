@@ -57,6 +57,21 @@ How positions are worked out:
   line is used and the result is marked `source="hole_line"` /
   `green_source="hole_line"`.
 
+### Tee colours from a scorecard
+
+OpenStreetMap rarely says which tee box is which colour. Pass a scorecard to
+label them:
+
+```sh
+python -m coursemapper "Sterling Farms Golf Course, Stamford, CT" --scorecard scorecards/sterling_farms.json
+```
+
+A scorecard file lists each colour's yardage for holes 1–18 (see
+`scorecards/`). On each hole the longest set goes on the rearmost mapped box,
+and every other colour on the box whose distance forward of it best matches how
+much shorter that colour plays. Each tee box then lists its `colours`. Where
+fewer boxes are mapped than there are tee sets, several colours share a box.
+
 Each hole also reports `length_m`, its length along the mapped hole line.
 
 Results are only as good as the course's OpenStreetMap mapping. Holes of

@@ -7,6 +7,7 @@ course's mapping there.
 from .mapper import build_course_map
 from .models import Coordinate, CourseMap, Hole, TeeBox
 from .osm import CourseNotFoundError, CourseRef, OSMClient
+from .scorecard import apply_scorecard, load_scorecard
 
 __all__ = [
     "map_course",
@@ -18,6 +19,8 @@ __all__ = [
     "Hole",
     "OSMClient",
     "TeeBox",
+    "apply_scorecard",
+    "load_scorecard",
 ]
 
 

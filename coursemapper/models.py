@@ -25,6 +25,9 @@ class TeeBox:
     # "tee" when taken from a mapped tee feature, "hole_line" when inferred
     # from the start of the hole's centre line.
     source: str = "tee"
+    # Tee colours played from this box, longest first, when a scorecard was
+    # applied (see coursemapper.scorecard).
+    colours: list[str] = field(default_factory=list)
 
 
 @dataclass

@@ -3,6 +3,7 @@ import urllib.error
 
 from coursemapper import (
     Coordinate,
+    apply_scorecard,
     CourseNotFoundError,
     CourseRef,
     OSMClient,
@@ -258,6 +259,26 @@ class HazardTest(unittest.TestCase):
         water = way(11, {"natural": "water"}, square(LAT + 0.001, LON - 0.0003, half=0.00012))
         (hazards,) = self.hazards(hazard, water)
         self.assertEqual([h.kind for h in hazards], ["water"])
+
+
+class ScorecardTest(unittest.TestCase):
+    def test_colours_match_tee_boxes_by_yardage_gaps(self):
+        # Boxes 0 m, 20 m and 45 m forward of the back tee on a 330 m hole.
+        tees = [(LAT, LON), (LAT + 0.00018, LON), (LAT + 0.000405, LON)]
+        elements = [way(1, {"golf": "hole", "ref": "1"}, line((LAT, LON), (LAT + 0.003, LON)))] + [
+            {"type": "node", "id": 10 + i, "lat": a, "lon": b, "tags": {"golf": "tee"}} for i, (a, b) in enumerate(tees)
+        ]
+        course = build_course_map(COURSE, elements)
+        # Scorecard lengths (m) run longer than the map, as scorecards measure
+        # along the fairway; only the differences between colours matter.
+        apply_scorecard(course, {"Black": [360], "Blue": [338], "White": [334], "Red": [316]})
+        self.assertEqual([t.colours for t in course.holes[0].tees], [["Black"], ["Blue", "White"], ["Red"]])
+
+    def test_holes_beyond_scorecard_left_alone(self):
+        course = build_course_map(COURSE, ELEMENTS)
+        apply_scorecard(course, {"Black": [300]})
+        self.assertEqual(course.holes[0].tees[0].colours, ["Black"])
+        self.assertEqual(course.holes[1].tees[0].colours, [])
 
 
 class FakeFetch:
