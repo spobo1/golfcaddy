@@ -22,8 +22,8 @@ from .osm import CourseRef
 TEE_MATCH_RADIUS_M = 150.0
 GREEN_MATCH_RADIUS_M = 75.0
 
-# Hole lines are drawn from the back tee, so a tee farther than this beyond
-# the line's length from the green belongs to some other hole.
+# A tee more than this beyond the hole line's length from the green is
+# assumed to belong to another nearby hole if one fits better.
 TEE_OVERHANG_M = 25.0
 
 
@@ -95,8 +95,10 @@ def _assign_tees(lines: list[_HoleLine], tees: list[_Feature]) -> dict[int, list
     """Give each tee box to the hole whose line starts closest to it.
 
     A tee tagged with a hole number (``ref``) goes to the nearest hole with
-    that number. A tee is skipped for any hole it could not belong to: one
-    whose green is farther from the tee than the hole is long.
+    that number. Hole lines are usually drawn from the back tee, so a tee
+    farther from the green than the hole is long more likely belongs to
+    another nearby hole; it only stays with the nearest hole when no other
+    hole fits (some courses draw lines from a middle tee).
     """
     result: dict[int, list[_Feature]] = {}
     for tee in tees:
@@ -106,10 +108,12 @@ def _assign_tees(lines: list[_HoleLine], tees: list[_Feature]) -> dict[int, list
         )
         ref = _int(tee.tags.get("ref"))
         numbered = [i for i in candidates if _int(lines[i].tags.get("ref")) == ref]
-        for i in numbered or candidates:
-            if distance_m(tee.center, lines[i].end) <= lines[i].length_m + TEE_OVERHANG_M:
-                result.setdefault(i, []).append(tee)
-                break
+        candidates = numbered or candidates
+        plausible = [
+            i for i in candidates if distance_m(tee.center, lines[i].end) <= lines[i].length_m + TEE_OVERHANG_M
+        ]
+        if plausible or candidates:
+            result.setdefault((plausible or candidates)[0], []).append(tee)
     return result
 
 

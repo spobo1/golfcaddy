@@ -30,9 +30,11 @@ How positions are worked out:
   "golf", "links", "course" and "club"), else the nearest one.
 - **Tee boxes**: each mapped `golf=tee` feature (its centroid) is assigned to
   the hole whose line starts closest to it, within 150 m, or to the nearest
-  hole with the tee's `ref` number when it has one. Since hole lines start at
-  the back tee, a tee more than 25 m farther from the green than the hole is
-  long goes to the next-nearest hole instead. Tees are sorted back to front and
+  hole with the tee's `ref` number when it has one. Hole lines usually start
+  at the back tee, so a tee more than 25 m farther from the green than the
+  hole is long goes to another nearby hole if one fits; otherwise it stays
+  with the nearest hole (some courses draw lines from a middle tee). Tees are
+  sorted back to front and
   include the straight-line distance to the green centre.
 - **Green centre**: centroid of the `golf=green` polygon nearest the end of the
   hole line, within 75 m. Double greens shared by several holes use each hole

@@ -18,8 +18,8 @@ NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 USER_AGENT = "golfcaddy-coursemapper/0.1 (https://github.com/spobo1/golfcaddy)"
 
-# Overpass area ids are derived from the OSM id of the way/relation.
-_AREA_OFFSET = {"way": 2_400_000_000, "relation": 3_600_000_000}
+# OSM element types that can be a course boundary.
+_AREA_TYPES = ("way", "relation")
 
 # Errors meaning a server could not be reached (or kept failing), as opposed
 # to a bad response.
@@ -90,7 +90,7 @@ class OSMClient:
             if (
                 r.get("category") == "leisure"
                 and r.get("type") == "golf_course"
-                and r.get("osm_type") in _AREA_OFFSET
+                and r.get("osm_type") in _AREA_TYPES
             ):
                 return CourseRef(
                     name=r.get("name") or r.get("display_name") or name,
@@ -137,10 +137,12 @@ out tags center;
 
     def fetch_features(self, course: CourseRef) -> list[dict]:
         """Fetch golf holes, tees and greens inside the course boundary."""
-        area_id = _AREA_OFFSET[course.osm_type] + course.osm_id
+        # map_to_area builds the area from the boundary itself; Overpass's
+        # precomputed area ids (2400000000 + way id) can be missing.
         query = f"""
 [out:json][timeout:60];
-area({area_id})->.course;
+{course.osm_type}({course.osm_id});
+map_to_area->.course;
 (
   way["golf"="hole"](area.course);
   nwr["golf"="tee"](area.course);
@@ -149,9 +151,14 @@ area({area_id})->.course;
 out tags geom;
 """
         try:
-            return self._overpass(query)
+            elements = self._overpass(query)
         except NETWORK_ERRORS:
             return self._api_features(course)
+        if not any(e.get("tags", {}).get("golf") == "hole" for e in elements):
+            # Overpass answered but found no holes; check the main API before
+            # concluding the course has none mapped.
+            return self._api_features(course)
+        return elements
 
     def _overpass(self, query: str) -> list[dict]:
         return self._fetch(self._overpass_url, {"data": query}).get("elements", [])
@@ -187,7 +194,7 @@ out tags geom;
                 raise
             courses = []
             for e in elements:
-                if e["type"] in _AREA_OFFSET and e.get("tags", {}).get("leisure") == "golf_course":
+                if e["type"] in _AREA_TYPES and e.get("tags", {}).get("leisure") == "golf_course":
                     points = osmapi.element_points(e, roles={"outer"})
                     if points:
                         # Relation member ways are not joined into rings, so average them.

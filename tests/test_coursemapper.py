@@ -141,6 +141,16 @@ class BuildCourseMapTest(unittest.TestCase):
         self.assertEqual(h1.tees[0].source, "hole_line")
         self.assertEqual([t.source for t in h2.tees], ["tee"])
 
+    def test_tee_behind_middle_tee_line_is_kept(self):
+        # The line starts at a middle tee; the back tee 50 m behind it has no
+        # better hole to go to, so it stays.
+        elements = [
+            way(1, {"golf": "hole", "ref": "1"}, line((LAT, LON), (LAT + 0.003, LON))),
+            {"type": "node", "id": 3, "lat": LAT - 0.00045, "lon": LON, "tags": {"golf": "tee"}},
+        ]
+        (h1,) = build_course_map(COURSE, elements).holes
+        self.assertEqual([t.source for t in h1.tees], ["tee"])
+
     def test_relation_green(self):
         elements = [
             way(1, {"golf": "hole", "ref": "1"}, line((LAT - 0.003, LON), (LAT, LON))),
@@ -189,7 +199,7 @@ class MapCourseTest(unittest.TestCase):
         self.assertEqual((course.osm_type, course.osm_id), ("relation", 42))
         self.assertEqual(len(course.holes), 2)
         overpass_query = fetch.calls[1][1]["data"]
-        self.assertIn("area(3600000042)", overpass_query)
+        self.assertIn("relation(42);\nmap_to_area->.course;", overpass_query)
 
     def test_falls_back_to_course_near_clubhouse(self):
         nearby = {
@@ -219,6 +229,13 @@ class MapCourseTest(unittest.TestCase):
         self.assertEqual(len(course.holes), 2)
 
     def test_falls_back_to_osm_api_when_overpass_unreachable(self):
+        self._check_osm_api_fallback(overpass_result=None)
+
+    def test_falls_back_to_osm_api_when_overpass_finds_no_holes(self):
+        self._check_osm_api_fallback(overpass_result={"elements": []})
+
+    def _check_osm_api_fallback(self, overpass_result):
+        """overpass_result=None means Overpass is unreachable."""
         def node(id_, lat, lon, tags=None):
             return {"type": "node", "id": id_, "lat": lat, "lon": lon, "tags": tags or {}}
 
@@ -240,7 +257,9 @@ class MapCourseTest(unittest.TestCase):
         def fetch(url, data):
             urls.append(url)
             if data is not None:
-                raise urllib.error.URLError("connection reset")
+                if overpass_result is None:
+                    raise urllib.error.URLError("connection reset")
+                return overpass_result
             if url.endswith("/way/50/full.json"):
                 return {"elements": boundary_nodes + [boundary]}
             if "/map.json?bbox=" in url:
