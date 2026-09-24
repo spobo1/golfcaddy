@@ -1,5 +1,8 @@
+import http.client
+import io
 import unittest
 import urllib.error
+from unittest import mock
 
 from coursemapper import (
     Coordinate,
@@ -279,6 +282,23 @@ class ScorecardTest(unittest.TestCase):
         apply_scorecard(course, {"Black": [300]})
         self.assertEqual(course.holes[0].tees[0].colours, ["Black"])
         self.assertEqual(course.holes[1].tees[0].colours, [])
+
+
+class HttpFetchTest(unittest.TestCase):
+    def test_retries_a_response_cut_off_part_way(self):
+        from coursemapper.osm import http_fetch_json
+
+        responses = [http.client.IncompleteRead(b'{"elem'), io.BytesIO(b'{"elements": []}')]
+
+        def urlopen(req, timeout):
+            r = responses.pop(0)
+            if isinstance(r, Exception):
+                raise r
+            return r
+
+        with mock.patch("urllib.request.urlopen", urlopen), mock.patch("time.sleep") as sleep:
+            self.assertEqual(http_fetch_json("https://example.org"), {"elements": []})
+        sleep.assert_called_once()
 
 
 class FakeFetch:

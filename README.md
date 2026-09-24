@@ -168,8 +168,10 @@ python -m caddy "Sterling Farms Golf Course, Stamford, CT" --hole 17 --user ann 
 - **Choosing a club**: of the clubs that won't land in, or roll into and stop
   in, a hazard in the way (with 5 yd of leeway), the one finishing closest to
   the green centre, with yards past the back of the green counting double. So
-  it takes more club to carry a hazard when that works (`plan="carry"`) and
-  lays up short of it when it doesn't (`plan="layup"`). If every club is at
+  it takes more club to carry a hazard when that works (`plan="carry"`), plays
+  to the front of the green when a hazard cuts in past the centre
+  (`plan="front"`), and lays up short of a hazard before the green when it
+  can't be carried (`plan="layup"`). If every club is at
   risk, it picks the one closest to the green (`plan="no_safe_club"`).
 - **Driver** is only considered when the green is out of reach of every other
   club, unless `include_driver` says otherwise. `clubs=[...]` limits the choice

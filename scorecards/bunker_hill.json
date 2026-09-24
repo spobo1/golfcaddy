@@ -1,0 +1,12 @@
+{
+  "course": "Bunker Hill Golf Course, Princeton, NJ",
+  "source": "https://www.bunker.distinctgolf.com/scorecard/",
+  "source_name": "the club's scorecard",
+  "note": "The card's Back, Middle and Forward rows, which it colours blue, white and red.",
+  "unit": "yd",
+  "tees": {
+    "Blue": [368, 288, 489, 149, 312, 185, 491, 327, 340, 335, 281, 475, 182, 362, 148, 344, 285, 472],
+    "White": [358, 283, 483, 143, 306, 179, 475, 327, 325, 335, 281, 470, 177, 357, 133, 344, 279, 466],
+    "Red": [345, 197, 393, 138, 258, 150, 399, 265, 311, 255, 218, 400, 167, 283, 123, 309, 214, 414]
+  }
+}

@@ -51,8 +51,10 @@ class ShotAdvice:
     to_front_yd: Optional[float]
     to_back_yd: Optional[float]
     # "target": the club closest to the green centre. "carry": more club to
-    # clear a hazard. "layup": less club to stop short of one. "no_safe_club":
-    # every club risks a hazard, so this is the club closest to the target.
+    # clear a hazard. "front": less club, to the front of the green, to stay
+    # short of a hazard further on. "layup": less club, to stop short of a
+    # hazard before the green. "no_safe_club": every club risks a hazard, so
+    # this is the club closest to the target.
     plan: str
     reason: str
     # Hazards along or beside the line to the green, nearest first.
@@ -157,6 +159,8 @@ def advise_shot(
     else:
         chosen = closest(safe)
         plan = "target" if chosen is best else "carry" if chosen.total_yd > best.total_yd else "layup"
+        if plan == "layup" and to_front is not None and chosen.total_yd >= to_front - SAFETY_YD:
+            plan = "front"
 
     return ShotAdvice(
         club=chosen.club,
@@ -181,6 +185,8 @@ def _reason(chosen, best, plan, to_center, to_front, blocking) -> str:
     what = f"the {_KIND[hazard.kind]}" if hazard else ""
     if plan == "carry":
         return f"Take {name} to carry {what} ({hazard.carry_yd:.0f} to carry, {name} carries {chosen.carry_yd:.0f})."
+    if plan == "front":
+        return f"Play {name} to the front of the green, staying short of {what} ({hazard.reach_yd:.0f} to reach)."
     if plan == "layup":
         return f"Lay up with {name}, about {hazard.reach_yd - chosen.total_yd:.0f} short of {what} ({hazard.reach_yd:.0f} to reach)."
     if plan == "no_safe_club":

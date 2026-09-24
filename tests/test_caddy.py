@@ -77,6 +77,18 @@ class CaddyTest(unittest.TestCase):
         self.assertEqual((a.club, a.plan), ("9i", "layup"))
         self.assertEqual(a.reason, "Lay up with 9 iron, about 32 short of the water (160 to reach).")
 
+    def test_front_of_green_to_stay_short_of_bunker_past_the_centre(self):
+        # A bunker cuts in from 158 yd, just past the centre at 155. The 7 iron
+        # (155) would finish in it; the 9 iron (128) is far short; the front
+        # of the green is at 140.
+        bag = {"7i": (150, 155), "8i": (138, 142), "9i": (125, 128)}
+        for club, (carry, total) in bag.items():
+            self.tracker.record_shot("bo", club, carry_yd=carry, total_yd=total)
+        bunker = hazard("bunker", 158, 168, -5, 15)
+        a = advise_shot(self.tracker, "bo", hole(155, [bunker]), at(0), clubs=list(bag))
+        self.assertEqual((a.club, a.plan), ("8i", "front"))
+        self.assertEqual(a.reason, "Play 8 iron to the front of the green, staying short of the bunker (158 to reach).")
+
     def test_hazard_beside_the_line_is_listed_but_not_avoided(self):
         bunker = hazard("bunker", 140, 150, 15, 25)
         a = self.advise(hole(155, [bunker]))

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import http.client
 import json
 import re
 import time
@@ -21,9 +22,9 @@ USER_AGENT = "golfcaddy-coursemapper/0.1 (https://github.com/spobo1/golfcaddy)"
 # OSM element types that can be a course boundary.
 _AREA_TYPES = ("way", "relation")
 
-# Errors meaning a server could not be reached (or kept failing), as opposed
-# to a bad response.
-NETWORK_ERRORS = (urllib.error.URLError, ConnectionError, TimeoutError)
+# Errors meaning a server could not be reached, kept failing, or cut its
+# response off part-way, as opposed to a bad response.
+NETWORK_ERRORS = (urllib.error.URLError, ConnectionError, TimeoutError, http.client.IncompleteRead)
 
 # When the name search finds no golf course (e.g. it only matches the
 # clubhouse), look for courses within this distance of the best match.
@@ -63,7 +64,7 @@ def http_fetch_json(url: str, data: Optional[dict] = None, timeout: float = 90) 
                 raise
             retry_after = e.headers.get("Retry-After", "")
             delay = int(retry_after) if retry_after.isdigit() else delay
-        except (urllib.error.URLError, ConnectionError, TimeoutError):
+        except NETWORK_ERRORS:
             if delay is None:
                 raise
         time.sleep(delay)
