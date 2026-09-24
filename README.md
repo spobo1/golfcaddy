@@ -131,3 +131,48 @@ s.longer.club, s.shorter.club              # the clubs either side
   what's in the player's bag; the driver is left out unless
   `include_driver=True`. Beyond the longest club, it returns that club with a
   negative `difference_yd`.
+
+## caddy
+
+Club advice for the shot in front of the player, combining a hole from
+`coursemapper` (green front, centre and back, and its hazards) with the
+player's distances from `clubtracker`.
+
+```python
+from caddy import advise_shot, tee_position
+from clubtracker import ClubTracker
+from coursemapper import map_course
+
+course = map_course("Sterling Farms Golf Course, Stamford, CT")
+hole = next(h for h in course.holes if h.number == 17)
+tracker = ClubTracker("shots.db")
+
+advice = advise_shot(tracker, "ann", hole, tee_position(hole))   # or any GPS Coordinate
+advice.club, advice.reason   # "4i", "Take 4 iron to carry the bunker (148 to carry, 4 iron carries 160)."
+advice.to_front_yd, advice.to_center_yd, advice.to_back_yd
+advice.hazards               # bunkers and water along or beside the line, with reach and carry
+```
+
+Or from the command line:
+
+```sh
+python -m caddy "Sterling Farms Golf Course, Stamford, CT" --hole 17 --user ann --db shots.db \
+    --scorecard scorecards/sterling_farms.json --tee White
+```
+
+- **Hazards ahead**: bunkers and water that the line to the green centre runs
+  through or passes within 10 yd of are "in the way", with the yardage to
+  reach and to carry them. Ones up to 30 yd to the side are listed as `left`
+  or `right`. Hazards behind the player or more than 30 yd past the green are
+  ignored.
+- **Choosing a club**: of the clubs that won't land in, or roll into and stop
+  in, a hazard in the way (with 5 yd of leeway), the one finishing closest to
+  the green centre, with yards past the back of the green counting double. So
+  it takes more club to carry a hazard when that works (`plan="carry"`) and
+  lays up short of it when it doesn't (`plan="layup"`). If every club is at
+  risk, it picks the one closest to the green (`plan="no_safe_club"`).
+- **Driver** is only considered when the green is out of reach of every other
+  club, unless `include_driver` says otherwise. `clubs=[...]` limits the choice
+  to the player's bag.
+- Distances are straight lines. Wind, elevation and lie aren't taken into
+  account.
