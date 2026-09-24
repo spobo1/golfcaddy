@@ -95,7 +95,8 @@ class ClubTrackerTest(unittest.TestCase):
         self.assertEqual([d.club for d in bag], list(CLUBS))
         by_club = {d.club: d for d in bag}
         self.assertEqual((by_club["7i"].source, by_club["7i"].carry_yd), ("history", 158))
-        self.assertEqual((by_club["8i"].source, by_club["8i"].carry_yd), ("estimate", 140))
+        # 158 / 150 typical advanced 7i carry scales the estimates.
+        self.assertEqual((by_club["8i"].source, by_club["8i"].carry_yd), ("estimate", round(140 * 1.053, 1)))
 
     def test_estimates_get_shorter_down_the_bag(self):
         for level in ("beginner", "intermediate", "advanced", "expert"):
@@ -119,6 +120,48 @@ class ClubTrackerTest(unittest.TestCase):
             t.record_shot("ann", "putter", carry_yd=5)
         with self.assertRaises(ValueError):
             t.set_skill_level("ann", "pro")
+
+    def test_suggests_club_nearest_the_green(self):
+        t = self.tracker
+        t.set_skill_level("ann", "intermediate")
+        # Intermediate estimates (total): 7i 133.9, 8i 122.4, 9i 112.2.
+        s = t.suggest_club("ann", 125)
+        self.assertEqual((s.club, s.difference_yd), ("8i", -2.6))
+        self.assertEqual((s.longer.club, s.shorter.club), ("7i", "9i"))
+
+    def test_suggestion_uses_players_own_distances(self):
+        t = self.tracker
+        t.set_skill_level("ann", "intermediate")
+        for carry in (150, 154):  # Ann hits her 8 iron much further than typical
+            t.record_shot("ann", "8i", carry_yd=carry, total_yd=carry + 4)
+        s = t.suggest_club("ann", 155)
+        self.assertEqual((s.club, s.distance.source, s.difference_yd), ("8i", "history", 1))
+        # Her other clubs are scaled up to match (152 / 120 carry), so the
+        # 9 iron, not the typical 5 iron, is next shorter.
+        self.assertEqual((s.shorter.club, s.shorter.source, s.shorter.scale), ("9i", "estimate", 1.267))
+        self.assertEqual(s.shorter.carry_yd, round(110 * 1.267, 1))
+
+    def test_tie_goes_to_longer_club(self):
+        t = self.tracker
+        t.record_shot("ann", "8i", total_yd=130)
+        t.record_shot("ann", "9i", total_yd=120)
+        self.assertEqual(t.suggest_club("ann", 125, clubs=["8i", "9i"]).club, "8i")
+
+    def test_beyond_longest_club(self):
+        s = self.tracker.suggest_club("ann", 300)
+        self.assertEqual(s.club, "3w")  # driver is left out by default
+        self.assertLess(s.difference_yd, 0)
+        self.assertIsNone(s.longer)
+        self.assertEqual(self.tracker.suggest_club("ann", 300, include_driver=True).club, "driver")
+
+    def test_limited_to_clubs_in_the_bag(self):
+        s = self.tracker.suggest_club("ann", 175, clubs=["driver", "5i", "7i", "9i", "pw"], include_driver=False)
+        self.assertEqual(s.club, "5i")
+        self.assertEqual(s.shorter.club, "7i")
+        with self.assertRaises(ValueError):
+            self.tracker.suggest_club("ann", 150, clubs=["driver"])
+        with self.assertRaises(ValueError):
+            self.tracker.suggest_club("ann", 0)
 
     def test_history_persists_in_a_file(self):
         with tempfile.TemporaryDirectory() as d:

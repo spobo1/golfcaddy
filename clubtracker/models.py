@@ -78,3 +78,21 @@ class ClubDistance:
     shots: int = 0
     # The skill level an estimate was based on.
     skill_level: Optional[str] = None
+    # What an estimate's typical distance was multiplied by: how far the
+    # player hits their other clubs compared with typical (1.0 with no history).
+    scale: float = 1.0
+
+
+@dataclass
+class ClubSuggestion:
+    """The club to hit for a distance, with the clubs either side of it."""
+
+    club: str
+    distance: ClubDistance
+    target_yd: float
+    # Where the suggested club is expected to finish relative to the target:
+    # positive is long, negative is short.
+    difference_yd: float
+    # The next club that goes further and the next that goes shorter, if any.
+    longer: Optional[ClubDistance] = None
+    shorter: Optional[ClubDistance] = None

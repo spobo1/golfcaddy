@@ -6,7 +6,7 @@ clubs they haven't hit yet.
 """
 
 from .clubs import CLUBS, DEFAULT_SKILL_LEVEL, SKILL_LEVELS, normalize_club
-from .models import ClubDistance, ClubStats, LaunchData, Shot
+from .models import ClubDistance, ClubStats, ClubSuggestion, LaunchData, Shot
 from .tracker import ClubTracker
 
 __all__ = [
@@ -15,6 +15,7 @@ __all__ = [
     "SKILL_LEVELS",
     "ClubDistance",
     "ClubStats",
+    "ClubSuggestion",
     "ClubTracker",
     "LaunchData",
     "Shot",

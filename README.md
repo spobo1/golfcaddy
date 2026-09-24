@@ -105,6 +105,10 @@ tracker.club_averages("ann")               # per-club averages, incl. launch dat
 tracker.club_distance("ann", "7i")         # source="history": Ann's average
 tracker.club_distance("ann", "pw")         # source="estimate": typical intermediate PW
 tracker.bag("ann")                          # every club, longest first
+
+s = tracker.suggest_club("ann", 155)       # club for 155 yd to the green
+s.club, s.difference_yd                    # e.g. "6i", +4.0 (finishes 4 yd long)
+s.longer.club, s.shorter.club              # the clubs either side
 ```
 
 - **Clubs**: driver, 3/5/7 woods, 3–5 hybrids, 3–9 irons and PW/GW/SW/LW.
@@ -116,6 +120,14 @@ tracker.bag("ann")                          # every club, longest first
 - **Distances**: a club's distance is the player's average once they have a
   shot with it. Otherwise it's an estimate from typical carries for their
   skill level (`beginner`, `intermediate`, `advanced`, `expert`; players
-  without one set are treated as `intermediate`). When only carry or only
+  without one set are treated as `intermediate`), scaled by how far the player
+  hits the clubs they do have history with compared with typical. When only carry or only
   total is known, the other is worked out from typical roll for the club.
 - `delete_shot(id)` removes a shot entered by mistake.
+- **Club suggestions**: `suggest_club(user, distance_yd)` picks the club whose
+  total distance (carry plus roll) finishes closest to the target, usually the
+  green centre, and returns the next club up and down with it. Ties go to the
+  longer club, as most players miss short. `clubs=[...]` limits the choice to
+  what's in the player's bag; the driver is left out unless
+  `include_driver=True`. Beyond the longest club, it returns that club with a
+  negative `difference_yd`.

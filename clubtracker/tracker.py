@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Iterable, Optional
 
 from .clubs import CLUBS, DEFAULT_SKILL_LEVEL, normalize_club, normalize_skill_level, roll_fraction, typical_carry_yd
-from .models import ClubDistance, ClubStats, LaunchData, Shot
+from .models import ClubDistance, ClubStats, ClubSuggestion, LaunchData, Shot
 
 _LAUNCH = LaunchData.names()
 
@@ -144,23 +144,68 @@ class ClubTracker:
         """How far the player hits a club.
 
         Uses the player's average when they have shots with the club,
-        otherwise typical distances for their skill level. A missing carry
-        or total is worked out from the other using typical roll.
+        otherwise typical distances for their skill level, scaled by how far
+        the player hits the clubs they do have history with compared with
+        typical. A missing carry or total is worked out from the other using
+        typical roll.
         """
         club = normalize_club(club)
-        return _distance(club, self.club_averages(user_id).get(club), self.skill_level(user_id))
+        return next(d for d in self.bag(user_id) if d.club == club)
 
     def bag(self, user_id: str) -> list[ClubDistance]:
         """Distances for every club, longest club first."""
         averages, level = self.club_averages(user_id), self.skill_level(user_id)
-        return [_distance(club, averages.get(club), level) for club in CLUBS]
+        history = {club: _from_history(club, stats) for club, stats in averages.items()}
+        # How the player's distances compare with typical for their level.
+        ratios = [d.carry_yd / typical_carry_yd(club, level) for club, d in history.items()]
+        scale = round(sum(ratios) / len(ratios), 3) if ratios else 1.0
+        return [history.get(club) or _estimate(club, level, scale) for club in CLUBS]
+
+    def suggest_club(
+        self,
+        user_id: str,
+        distance_yd: float,
+        clubs: Optional[Iterable[str]] = None,
+        include_driver: bool = False,
+    ) -> ClubSuggestion:
+        """The club whose total distance (carry plus roll) is closest to ``distance_yd``.
+
+        Meant for the distance to the centre of the green. Uses the player's
+        averages where they have them and skill-level estimates elsewhere.
+        ``clubs`` limits the choice to the clubs the player carries. The
+        driver is left out unless ``include_driver`` is set, since it is
+        rarely hit into a green. When two clubs are equally close, the longer
+        one is suggested, since most players miss short.
+        """
+        if distance_yd <= 0:
+            raise ValueError(f"distance_yd must be positive, got {distance_yd}")
+        allowed = {normalize_club(c) for c in clubs} if clubs is not None else set(CLUBS)
+        if not include_driver:
+            allowed.discard("driver")
+        if not allowed:
+            raise ValueError("No clubs to choose from")
+        # Longest first, so ties go to the longer club.
+        options = sorted((d for d in self.bag(user_id) if d.club in allowed), key=lambda d: -d.total_yd)
+        best = min(range(len(options)), key=lambda i: abs(options[i].total_yd - distance_yd))
+        chosen = options[best]
+        return ClubSuggestion(
+            club=chosen.club,
+            distance=chosen,
+            target_yd=distance_yd,
+            difference_yd=round(chosen.total_yd - distance_yd, 1),
+            longer=options[best - 1] if best > 0 else None,
+            shorter=options[best + 1] if best + 1 < len(options) else None,
+        )
 
 
-def _distance(club: str, stats: Optional[ClubStats], skill_level: str) -> ClubDistance:
+def _estimate(club: str, skill_level: str, scale: float) -> ClubDistance:
+    carry = _round(typical_carry_yd(club, skill_level) * scale)
+    total = _round(carry * (1 + roll_fraction(club)))
+    return ClubDistance(club, carry, total, "estimate", skill_level=skill_level, scale=scale)
+
+
+def _from_history(club: str, stats: ClubStats) -> ClubDistance:
     roll = roll_fraction(club)
-    if stats is None:
-        carry = typical_carry_yd(club, skill_level)
-        return ClubDistance(club, carry, _round(carry * (1 + roll)), "estimate", skill_level=skill_level)
     carry = stats.carry_yd if stats.carry_yd is not None else _round(stats.total_yd / (1 + roll))
     total = stats.total_yd if stats.total_yd is not None else _round(stats.carry_yd * (1 + roll))
     return ClubDistance(club, carry, total, "history", shots=stats.shots)
