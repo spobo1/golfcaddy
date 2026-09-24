@@ -125,6 +125,19 @@ class BuildCourseMapTest(unittest.TestCase):
         self.assertAlmostEqual(distance_m(hole.green_front, hole.green_back), 22.2, delta=0.5)
         self.assertAlmostEqual(hole.green_front.lon, end[1], places=6)
 
+    def test_fairways_go_to_nearest_hole(self):
+        holes = [
+            way(1, {"golf": "hole", "ref": "1"}, line((LAT, LON), (LAT + 0.003, LON))),
+            way(2, {"golf": "hole", "ref": "2"}, line((LAT, LON + 0.001), (LAT + 0.003, LON + 0.001))),
+        ]
+        fairway1 = way(10, {"golf": "fairway"}, square(LAT + 0.0015, LON + 0.0001, half=0.0003))
+        fairway2 = way(11, {"golf": "fairway"}, square(LAT + 0.0015, LON + 0.0009, half=0.0003))
+        stray = way(12, {"golf": "fairway"}, square(LAT + 0.0015, LON + 0.004))
+        h1, h2 = build_course_map(COURSE, [*holes, fairway1, fairway2, stray]).holes
+        self.assertEqual(len(h1.fairways), 1)
+        self.assertEqual(len(h2.fairways), 1)
+        self.assertAlmostEqual(centroid(h1.fairways[0]).lon, LON + 0.0001, places=6)
+
     def test_falls_back_to_hole_line(self):
         h2 = self.course.holes[1]
         self.assertEqual(len(h2.tees), 1)

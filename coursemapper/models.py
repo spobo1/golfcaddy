@@ -61,6 +61,8 @@ class Hole:
     # green's outline isn't mapped.
     green_front: Optional[Coordinate] = None
     green_back: Optional[Coordinate] = None
+    # Outlines of this hole's fairway(s); some holes have split fairways.
+    fairways: list[list[Coordinate]] = field(default_factory=list)
     # Bunkers and water in play on this hole, nearest to the tee first.
     hazards: list[Hazard] = field(default_factory=list)
 

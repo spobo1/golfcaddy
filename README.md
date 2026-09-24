@@ -43,6 +43,8 @@ How positions are worked out:
   green centre crosses the green's outline. The approach direction comes from
   the last 100 m of the hole line, so doglegs are measured the way the green
   is actually played. Each tee also gets its distance to the front and back.
+- **Fairways**: each `golf=fairway` outline goes to the hole whose line passes
+  closest to its centre (within 60 m). Split fairways give a hole several.
 - **Hazards**: bunkers (`golf=bunker`), water hazards (`golf=water_hazard`,
   `golf=lateral_water_hazard`) and other water (`natural=water`, unless it
   duplicates a mapped water hazard). OpenStreetMap doesn't say which hole a

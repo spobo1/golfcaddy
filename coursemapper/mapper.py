@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-from .geo import LocalProjection, centroid, chord_through, distance_m, point_back_along
+from .geo import LocalProjection, centroid, chord_through, distance_m, offset_from_polyline, point_back_along
 from .hazards import extract_hazards, hazards_for_holes
 from .models import Coordinate, CourseMap, Hole, TeeBox
 from .osm import CourseRef
@@ -26,6 +26,10 @@ GREEN_MATCH_RADIUS_M = 75.0
 # Front and back of the green are measured along the line from this far back
 # on the hole line, so a dogleg's approach direction is used, not the tee's.
 APPROACH_M = 100.0
+
+# A fairway belongs to the hole whose line passes closest to its centre, if
+# that is within this distance.
+FAIRWAY_MATCH_M = 60.0
 
 # A tee more than this beyond the hole line's length from the green is
 # assumed to belong to another nearby hole if one fits better.
@@ -53,6 +57,7 @@ def build_course_map(course: CourseRef, elements: list[dict]) -> CourseMap:
     hole_lines: list[_HoleLine] = []
     tees: list[_Feature] = []
     greens: list[_Feature] = []
+    fairways: list[list[Coordinate]] = []
 
     for el in elements:
         kind = el.get("tags", {}).get("golf")
@@ -61,6 +66,10 @@ def build_course_map(course: CourseRef, elements: list[dict]) -> CourseMap:
             if len(pts) >= 2:
                 length = sum(distance_m(a, b) for a, b in zip(pts, pts[1:]))
                 hole_lines.append(_HoleLine(el["tags"], pts[0], pts[-1], length, pts))
+        elif kind == "fairway":
+            pts = _points(el)
+            if len(pts) >= 3:
+                fairways.append(pts)
         elif kind in ("tee", "green"):
             pts = _points(el)
             if pts:
@@ -106,8 +115,10 @@ def build_course_map(course: CourseRef, elements: list[dict]) -> CourseMap:
         [hole.green_center for hole in holes],
         extract_hazards(elements, _points),
     )
+    fairways_by_hole = _assign_fairways(hole_lines, fairways)
     for i, hole in enumerate(holes):
         hole.hazards = hazards.get(i, [])
+        hole.fairways = fairways_by_hole.get(i, [])
 
     holes.sort(key=lambda h: (h.number is None, h.number or 0))
     return CourseMap(name=course.name, osm_type=course.osm_type, osm_id=course.osm_id, holes=holes)
@@ -161,6 +172,24 @@ def _assign_greens(
         i: (lines[i].end if users[green.osm_key] > 1 else green.center, green.points)
         for i, green in chosen.items()
     }
+
+
+def _assign_fairways(
+    lines: list[_HoleLine], fairways: list[list[Coordinate]]
+) -> dict[int, list[list[Coordinate]]]:
+    """Give each fairway to the hole whose line passes closest to its centre."""
+    result: dict[int, list[list[Coordinate]]] = {}
+    if not lines:
+        return result
+    proj = LocalProjection(lines[0].start)
+    lines_xy = [[proj.xy(p) for p in line.points] for line in lines]
+    for outline in fairways:
+        center = proj.xy(centroid(outline))
+        gaps = [abs(offset_from_polyline(center, line_xy)) for line_xy in lines_xy]
+        best = min(range(len(lines)), key=gaps.__getitem__)
+        if gaps[best] <= FAIRWAY_MATCH_M:
+            result.setdefault(best, []).append(outline)
+    return result
 
 
 def _front_and_back(

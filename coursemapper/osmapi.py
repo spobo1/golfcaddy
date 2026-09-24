@@ -82,11 +82,11 @@ def bbox(points: Iterable[Coordinate], pad: float = 0.0) -> tuple[float, float, 
     )
 
 
-_GOLF_AREAS = ("tee", "green", "bunker", "water_hazard", "lateral_water_hazard")
+_GOLF_AREAS = ("tee", "green", "fairway", "bunker", "water_hazard", "lateral_water_hazard")
 
 
 def golf_features_inside(elements: list[dict], rings: list[list[Coordinate]]) -> list[dict]:
-    """Holes, tees, greens, bunkers and water with at least one point inside the course.
+    """Holes, tees, greens, fairways, bunkers and water with at least one point inside the course.
 
     Mirrors Overpass's ``(area)`` filter, which matches a way when any of its
     nodes falls inside the area.
