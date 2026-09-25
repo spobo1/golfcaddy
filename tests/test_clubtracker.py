@@ -13,6 +13,7 @@ class NormalizeClubTest(unittest.TestCase):
         cases = {
             "Driver": "driver", "7 iron": "7i", "7-Iron": "7i", "3 Wood": "3w",
             "4 hybrid": "4h", "PW": "pw", "sand wedge": "sw", "Gap": "gw", "lw": "lw",
+            "seven iron": "7i", "Three Wood": "3w",
         }
         for name, code in cases.items():
             self.assertEqual(normalize_club(name), code, name)

@@ -14,6 +14,11 @@ CLUBS = (
 
 SKILL_LEVELS = ("beginner", "intermediate", "advanced", "expert")
 
+# How well a shot was struck. Mishits (tops, fats, shanks) are kept in the
+# history but left out of club averages, since they aren't how far the club
+# goes.
+STRIKES = ("good", "ok", "mishit")
+
 # Used when a user's skill level hasn't been set.
 DEFAULT_SKILL_LEVEL = "intermediate"
 
@@ -70,15 +75,19 @@ _ALIASES = {
     "s": "sw", "sandwedge": "sw", "sand": "sw",
     "l": "lw", "lobwedge": "lw", "lob": "lw",
 }
+_NUMBER_WORDS = {"one": "1", "two": "2", "three": "3", "four": "4", "five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9"}
 _KIND = {"wood": "w", "w": "w", "hybrid": "h", "hy": "h", "h": "h", "rescue": "h", "iron": "i", "i": "i"}
 
 
 def normalize_club(name: str) -> str:
-    """Turn a club name like "7 iron", "7-Iron", "3 wood" or "PW" into its code.
+    """Turn a club name like "7 iron", "7-Iron", "seven iron", "3 wood" or "PW" into its code.
 
     Raises ValueError for anything that isn't a club in CLUBS.
     """
-    key = re.sub(r"[\s\-_]", "", name.strip().lower())
+    key = name.strip().lower()
+    for word, digit in _NUMBER_WORDS.items():
+        key = re.sub(rf"\b{word}\b", digit, key)
+    key = re.sub(r"[\s\-_]", "", key)
     if key in CLUBS:
         return key
     if key in _ALIASES:
@@ -89,6 +98,13 @@ def normalize_club(name: str) -> str:
         if code in CLUBS:
             return code
     raise ValueError(f"Unknown club {name!r}; expected one of {', '.join(CLUBS)}")
+
+
+def normalize_strike(strike: str) -> str:
+    key = strike.strip().lower()
+    if key not in STRIKES:
+        raise ValueError(f"Unknown strike {strike!r}; expected one of {', '.join(STRIKES)}")
+    return key
 
 
 def normalize_skill_level(level: str) -> str:

@@ -124,6 +124,13 @@ s.longer.club, s.shorter.club              # the clubs either side
   hits the clubs they do have history with compared with typical. When only carry or only
   total is known, the other is worked out from typical roll for the club.
 - `delete_shot(id)` removes a shot entered by mistake.
+- **Strike**: each shot can be marked `good`, `ok` or `mishit`. Mishits stay
+  in the history but are left out of averages.
+- **Range practice logs**: `import_range_csv(user, path)` (or
+  `python -m clubtracker import --db shots.db --user ann range-log.csv`) loads
+  the CSV written by the `range-practice` skill. Re-importing the same file
+  doesn't duplicate shots. `python -m clubtracker averages --db shots.db --user ann`
+  lists each club's averages.
 - **Club suggestions**: `suggest_club(user, distance_yd)` picks the club whose
   total distance (carry plus roll) finishes closest to the target, usually the
   green centre, and returns the next club up and down with it. Ties go to the
@@ -201,3 +208,17 @@ To add a course, add its scorecard to `scorecards/` and an entry to
   the map using the extent the service reports. `--no-aerial` skips it.
 - **Caddy advice** is worked out ahead of time with `caddy` for every hole,
   tee colour and skill level, using typical distances for that level.
+
+## range-practice skill
+
+A Claude skill (`.claude/skills/range-practice/`) for logging a session at the
+driving range. For each shot it asks which club, how far it went and whether it
+was a good, ok or mishit strike (shorthand like "7i 150 good" works), keeps
+running averages per club, and at the end gives you `range-log.csv`: your whole
+history plus today. Upload that file at the start of your next session so the
+log keeps growing, or import it into clubtracker so the caddy uses your real
+distances.
+
+It's picked up automatically in Claude Code sessions in this repo. To use it in
+the Claude app, install the packaged `range-practice.skill` file into your
+Claude profile.

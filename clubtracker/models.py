@@ -45,6 +45,8 @@ class Shot:
     carry_yd: Optional[float] = None
     total_yd: Optional[float] = None
     launch: LaunchData = field(default_factory=LaunchData)
+    # "good", "ok" or "mishit", when known. Mishits are left out of averages.
+    strike: Optional[str] = None
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -54,7 +56,7 @@ class Shot:
 
 @dataclass
 class ClubStats:
-    """A club's averages over a player's shot history."""
+    """A club's averages over a player's shot history, leaving out mishits."""
 
     club: str
     shots: int
@@ -63,6 +65,8 @@ class ClubStats:
     total_yd: Optional[float]
     # Averages of each launch monitor reading, over the shots that have it.
     launch: LaunchData
+    # Mishits with this club, which ``shots`` and the averages leave out.
+    mishits: int = 0
 
 
 @dataclass
