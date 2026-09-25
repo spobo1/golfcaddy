@@ -1,0 +1,639 @@
+<title>__TITLE__</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #eef2ec;
+  --surface: #ffffff;
+  --ink: #15241a;
+  --muted: #5a6b5f;
+  --rule: #d5ddd4;
+  --fairway: #3d7a4e;
+  --fairway-dim: #b9cbbb;
+  --green: #2e9b52;
+  --pin: #c33f2e;
+  --tee: #15241a;
+  --select: #e8f1e7;
+  --fairway-fill: #b6d9a8;
+  --swatch-edge: #9aa89e;
+  --sand: #dcc48a;
+  --sand-ink: #8a6d22;
+  --water: #6aa6d8;
+  --water-ink: #2d6ea6;
+  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0e1611;
+    --surface: #152019;
+    --ink: #e4ede5;
+    --muted: #93a598;
+    --rule: #26352b;
+    --fairway: #74b98a;
+    --fairway-dim: #2f4436;
+    --green: #4fbf73;
+    --pin: #ec7a66;
+    --tee: #e4ede5;
+    --select: #1d2d23;
+    --fairway-fill: #2f5a39;
+    --swatch-edge: #6d8074;
+    --sand: #8b7743;
+    --sand-ink: #d8bf7e;
+    --water: #3b78ad;
+    --water-ink: #8cc0ea;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0e1611;
+  --surface: #152019;
+  --ink: #e4ede5;
+  --muted: #93a598;
+  --rule: #26352b;
+  --fairway: #74b98a;
+  --fairway-dim: #2f4436;
+  --green: #4fbf73;
+  --pin: #ec7a66;
+  --tee: #e4ede5;
+  --select: #1d2d23;
+  --fairway-fill: #2f5a39;
+  --swatch-edge: #6d8074;
+  --sand: #8b7743;
+  --sand-ink: #d8bf7e;
+  --water: #3b78ad;
+  --water-ink: #8cc0ea;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 28px 16px 48px;
+  display: grid;
+  gap: 24px;
+}
+
+header { display: grid; gap: 6px; }
+.eyebrow {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(34px, 7vw, 52px);
+  line-height: 1;
+  text-wrap: balance;
+}
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.facts span { color: var(--muted); }
+.facts b { font-family: var(--display); font-size: 20px; font-weight: 600; color: var(--ink); margin-right: 4px; }
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 760px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+}
+
+.map-card {
+  position: sticky;
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+@media (max-width: 760px) {
+  .map-card { position: static; }
+}
+#map { width: 100%; height: auto; display: block; touch-action: manipulation; }
+.map-caption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.legend { display: flex; gap: 12px; flex-wrap: wrap; }
+.legend i { display: inline-block; width: 9px; height: 9px; margin-right: 5px; vertical-align: 0; }
+.legend .l-tee { background: var(--tee); }
+.legend .l-green { background: var(--green); border-radius: 50%; }
+
+.hole-line { stroke: var(--fairway-dim); stroke-width: 3; stroke-linecap: round; fill: none; }
+.tee-dot { fill: var(--tee); opacity: .35; }
+.green-dot { fill: var(--green); opacity: .45; }
+.hole-num { font-family: var(--display); font-weight: 600; font-size: 15px; fill: var(--muted); }
+.hole-hit { fill: transparent; stroke: transparent; stroke-width: 24; cursor: pointer; }
+g.hole.active .hole-line { stroke: var(--fairway); stroke-width: 5; }
+g.hole.active .tee-dot { opacity: 1; }
+g.hole.active .green-dot { opacity: 1; }
+g.hole.active .pin { fill: var(--pin); }
+g.hole.active .hole-num { fill: var(--ink); font-size: 18px; }
+.pin { fill: transparent; }
+.depth { stroke: transparent; stroke-width: 2; stroke-linecap: round; }
+g.hole.active .depth { stroke: var(--ink); }
+.view-toggle { display: inline-flex; gap: 4px; justify-self: start; }
+.view-toggle button {
+  font: inherit;
+  font-size: 13px;
+  padding: 3px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.view-toggle button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.view-toggle button:focus-visible { outline: 2px solid var(--fairway); outline-offset: 2px; }
+
+/* Aerial view: the photo shows the fairways, so draw light outlines on top of it. */
+#map .aerial-img { display: none; }
+#map.aerial .aerial-img { display: inline; }
+#map.aerial .fw { display: none; }
+#map.aerial .hz { fill: none; stroke-width: 1.5; opacity: .55; }
+#map.aerial .hz.b { stroke: #f6e7b0; }
+#map.aerial .hz.w, #map.aerial .hz.l { stroke: #a8d8ff; }
+#map.aerial .hz.on { opacity: 1; stroke-width: 2.5; }
+#map.aerial .hole-line { stroke: rgba(255, 255, 255, .45); stroke-width: 2; }
+#map.aerial g.hole.active .hole-line { stroke: #ffffff; stroke-width: 3.5; }
+#map.aerial .tee-dot { fill: #ffffff; opacity: .6; }
+#map.aerial g.hole.active .tee-dot { opacity: 1; }
+#map.aerial .green-dot { fill: none; stroke: #ffffff; stroke-width: 1.5; opacity: .7; }
+#map.aerial g.hole.active .green-dot { stroke-width: 2.5; opacity: 1; }
+#map.aerial .hole-num, #map.aerial g.hole.active .hole-num { fill: #ffffff; paint-order: stroke; stroke: rgba(0, 0, 0, .7); stroke-width: 3px; }
+#map.aerial g.hole.active .depth { stroke: #ffffff; }
+
+.fw { fill: var(--fairway-fill); stroke: none; opacity: .55; }
+.fw.on { opacity: 1; }
+.legend .l-fairway { background: var(--fairway-fill); border-radius: 2px; }
+.hz { stroke: none; opacity: .45; }
+.hz.b { fill: var(--sand); }
+.hz.w, .hz.l { fill: var(--water); }
+.hz.on { opacity: 1; }
+.legend .l-sand { background: var(--sand); border-radius: 2px; }
+.legend .l-water { background: var(--water); border-radius: 2px; }
+
+.holes { display: grid; gap: 0; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+.nine {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 10px 16px 6px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--rule);
+}
+.hole-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  scroll-margin-top: 16px;
+}
+.hole-row:last-child { border-bottom: 0; }
+.hole-row:focus-visible { outline: 2px solid var(--fairway); outline-offset: -2px; }
+.hole-row.active { background: var(--select); }
+.num {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 30px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.num small { display: block; font-size: 13px; font-weight: 600; letter-spacing: .08em; color: var(--muted); margin-top: 4px; }
+.detail { display: grid; gap: 8px; min-width: 0; }
+.tees { display: flex; flex-wrap: wrap; gap: 6px; }
+.tee {
+  display: inline-grid;
+  justify-items: center;
+  line-height: 1.15;
+  padding: 2px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.tee em { font-style: normal; font-size: 12px; color: var(--muted); font-weight: 500; }
+.swatches { display: flex; gap: 3px; min-height: 9px; margin-bottom: 2px; }
+.sw { width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--swatch-edge); }
+.card-line { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.card-line span { display: inline-flex; align-items: center; gap: 4px; }
+.card-line b { color: var(--ink); font-weight: 600; }
+.tee .fb { font-family: var(--body); font-size: 11.5px; font-weight: 400; color: var(--muted); }
+.tees-head { font-family: var(--display); font-weight: 600; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.tee.back { border-color: var(--fairway); }
+.coords {
+  display: grid;
+  grid-template-columns: 3.2em auto auto;
+  gap: 4px 8px;
+  justify-content: start;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.coords code { font-family: var(--mono); font-size: 12px; color: var(--ink); user-select: all; white-space: nowrap; }
+.copy {
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.copy:hover { color: var(--ink); border-color: var(--muted); }
+.copy:focus-visible { outline: 2px solid var(--fairway); outline-offset: 1px; }
+.hazards { display: grid; gap: 3px; max-width: 22rem; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.hazards-head { display: flex; justify-content: space-between; font-family: var(--display); font-weight: 600; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.hazard { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; max-width: 22rem; }
+.hazard i { width: 10px; height: 10px; border-radius: 2px; align-self: center; }
+.hazard.b i { background: var(--sand); }
+.hazard.w i, .hazard.l i { background: var(--water); }
+.hazard .what { font-weight: 600; }
+.hazard.b .what { color: var(--sand-ink); }
+.hazard.w .what, .hazard.l .what { color: var(--water-ink); }
+.hazard .side { color: var(--muted); font-weight: 400; }
+.hazard .yd { color: var(--muted); text-align: right; }
+.hazard .yd b { color: var(--ink); font-weight: 600; }
+.no-hazards { font-size: 13px; color: var(--muted); }
+.tee-list { display: none; font-family: var(--mono); font-size: 12px; color: var(--muted); gap: 2px; }
+.hole-row.active .tee-list { display: grid; }
+
+footer { font-size: 13px; color: var(--muted); max-width: 70ch; display: grid; gap: 6px; }
+footer p { margin: 0; }
+
+.caddy-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 20px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+}
+.caddy-bar .label { font-family: var(--display); font-weight: 600; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.picker { display: flex; flex-wrap: wrap; gap: 4px; border: 0; margin: 0; padding: 0; }
+.picker legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.picker input { position: absolute; opacity: 0; pointer-events: none; }
+.picker label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  font-size: 13.5px;
+  cursor: pointer;
+  user-select: none;
+}
+.picker input:checked + label { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.picker input:focus-visible + label { outline: 2px solid var(--fairway); outline-offset: 2px; }
+
+.caddy {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--fairway);
+  background: var(--select);
+  border-radius: 0 6px 6px 0;
+}
+.hole-row.active .caddy { background: var(--surface); }
+.caddy .top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.caddy .club { font-family: var(--display); font-weight: 700; font-size: 22px; line-height: 1.1; }
+.caddy .plan { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; border: 1px solid currentColor; }
+.caddy .plan.target { color: var(--fairway); }
+.caddy .plan.carry { color: var(--water-ink); }
+.caddy .plan.layup, .caddy .plan.front { color: var(--sand-ink); }
+.caddy .plan.no_safe_club { color: var(--pin); }
+.caddy .sw { display: inline-block; vertical-align: -1px; margin-right: 2px; }
+.caddy .yds { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.caddy .why { font-size: 14px; }
+.caddy.plan-carry { border-left-color: var(--water-ink); }
+.caddy.plan-layup, .caddy.plan-front { border-left-color: var(--sand-ink); }
+.caddy.plan-no_safe_club { border-left-color: var(--pin); }
+</style>
+
+<div class="page">
+  <header>
+    <div class="eyebrow">__PLACE__ &middot; yardage book and caddy</div>
+    <h1 id="course-name">__NAME__</h1>
+    <div class="facts" id="facts"></div>
+  </header>
+
+  <div class="caddy-bar">
+    <span class="label">Caddy</span>
+    <fieldset class="picker" id="skill-picker"><legend>Skill level</legend></fieldset>
+    <fieldset class="picker" id="tee-picker"><legend>Tee</legend></fieldset>
+  </div>
+
+  <div class="layout">
+    <div class="map-card">
+      <div class="view-toggle" id="view-toggle" role="group" aria-label="Map view" hidden>
+        <button type="button" id="view-aerial" aria-pressed="true">Aerial</button>
+        <button type="button" id="view-plan" aria-pressed="false">Plan</button>
+      </div>
+      <svg id="map" role="img" aria-label="Course map showing each hole from back tee to green, with fairways, bunkers and water"></svg>
+      <div class="map-caption">
+        <span id="map-status">Tap a hole to highlight it</span>
+        <span class="legend"><span><i class="l-tee"></i>Tee box</span><span><i class="l-green"></i>Green centre</span><span><i class="l-fairway"></i>Fairway</span><span><i class="l-sand"></i>Bunker</span><span><i class="l-water"></i>Water</span></span>
+      </div>
+    </div>
+
+    <div class="holes" id="holes"></div>
+  </div>
+
+  <footer>
+    <p>Yardages are straight lines from each tee box to the centre of the green, with the front and back of the green underneath, so doglegs read shorter than the scorecard. Front and back are where the line of approach into the green crosses its edge. Hazard yardages are from the back tee: reach is the near edge, carry the far edge. Sides are as seen from the tee. OpenStreetMap doesn't link hazards to holes, so each is matched to the hole that passes closest to it; water near two holes is listed on both. Tees are listed from the back.</p>
+    <p>Caddy suggestions use typical distances for the chosen skill level, assuming a full bag from driver to lob wedge; a player's own shot history would replace them. From the chosen tee it takes, of the clubs that won't land in or roll into a bunker or water in the way, the one finishing closest to the green centre, counting yards past the back of the green double. The driver is only suggested when the green is out of reach of every other club. It doesn't allow for wind, elevation or lie.</p>
+    <p id="tee-note"></p>
+    <p>Map data &copy; OpenStreetMap contributors (<span id="osm-ref"></span>), ODbL.<span id="aerial-credit" hidden> Aerial imagery: USGS The National Map / USDA NAIP, public domain.</span></p>
+  </footer>
+</div>
+
+<script>
+const DATA = __DATA__;
+
+const $ = (id) => document.getElementById(id);
+const holes = DATA.holes;
+
+// Summary facts.
+const par = (list) => list.reduce((s, h) => s + (h.par || 0), 0);
+const teeCount = holes.reduce((s, h) => s + h.t.length, 0);
+$("facts").innerHTML =
+  `<div><b>${holes.length}</b><span>holes</span></div>` +
+  `<div><b>${par(holes)}</b><span>par</span></div>` +
+  `<div><b>${teeCount}</b><span>tee boxes</span></div>` +
+  `<div><b>${DATA.hazards.filter((z) => z.k === "b").length}</b><span>bunkers</span></div>` +
+  `<div><b>${DATA.hazards.filter((z) => z.k !== "b").length}</b><span>water hazards</span></div>`;
+$("osm-ref").textContent = DATA.osm;
+
+// Map: equirectangular projection around the course's mean latitude.
+const pts = [...holes.flatMap((h) => [h.g, ...h.t.map((t) => [t[0], t[1]]), ...h.fw.flat()]), ...DATA.hazards.flatMap((z) => z.o)];
+const lat0 = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+const kx = Math.cos((lat0 * Math.PI) / 180);
+const xy = ([lat, lon]) => [lon * kx, -lat];
+// With an aerial photo, frame the map on the photo's exact extent so it
+// fills the map and everything drawn lines up with it.
+const AERIAL = DATA.aerial;
+const frame = AERIAL ? [[AERIAL.extent[0], AERIAL.extent[1]], [AERIAL.extent[2], AERIAL.extent[3]]] : pts;
+const proj = frame.map(xy);
+const minX = Math.min(...proj.map((p) => p[0])), maxX = Math.max(...proj.map((p) => p[0]));
+const minY = Math.min(...proj.map((p) => p[1])), maxY = Math.max(...proj.map((p) => p[1]));
+const W = 600, pad = AERIAL ? 0 : 28;
+const scale = (W - 2 * pad) / (maxX - minX);
+const H = Math.round((maxY - minY) * scale + 2 * pad);
+const P = (ll) => { const [x, y] = xy(ll); return [pad + (x - minX) * scale, pad + (y - minY) * scale]; };
+
+const svg = $("map");
+svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs, parent) => {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  parent.appendChild(e);
+  return e;
+};
+
+if (AERIAL) {
+  const [x0, y0] = P([AERIAL.extent[2], AERIAL.extent[1]]);
+  const [x1, y1] = P([AERIAL.extent[0], AERIAL.extent[3]]);
+  el("image", { class: "aerial-img", href: AERIAL.src, x: x0, y: y0, width: x1 - x0, height: y1 - y0, preserveAspectRatio: "none" }, svg);
+  $("view-toggle").hidden = false;
+  $("aerial-credit").hidden = false;
+  let view = "aerial";
+  try { if (localStorage.getItem("map-view") === "plan") view = "plan"; } catch {}
+  const setView = (v) => {
+    svg.classList.toggle("aerial", v === "aerial");
+    $("view-aerial").setAttribute("aria-pressed", String(v === "aerial"));
+    $("view-plan").setAttribute("aria-pressed", String(v === "plan"));
+    try { localStorage.setItem("map-view", v); } catch {}
+  };
+  $("view-aerial").addEventListener("click", () => setView("aerial"));
+  $("view-plan").addEventListener("click", () => setView("plan"));
+  setView(view);
+}
+
+const poly = (outline) => outline.map((p) => P(p).map((v) => v.toFixed(1)).join(",")).join(" ");
+const fairwayLayer = el("g", {}, svg);
+const fairwayEls = {};
+for (const h of holes) fairwayEls[h.n] = h.fw.map((o) => el("polygon", { class: "fw", points: poly(o) }, fairwayLayer));
+const hazardLayer = el("g", {}, svg);
+const hazardEls = DATA.hazards.map((z) =>
+  el("polygon", { class: `hz ${z.k}`, points: poly(z.o) }, hazardLayer)
+);
+
+const groups = {};
+for (const h of holes) {
+  const g = el("g", { class: "hole", "data-n": h.n }, svg);
+  const [gx, gy] = P(h.g);
+  const [bx, by] = P(h.t[0]);
+  el("line", { class: "hole-line", x1: bx, y1: by, x2: gx, y2: gy }, g);
+  for (const t of h.t) {
+    const [tx, ty] = P(t);
+    el("rect", { class: "tee-dot", x: tx - 3, y: ty - 3, width: 6, height: 6 }, g);
+  }
+  el("circle", { class: "green-dot", cx: gx, cy: gy, r: 7 }, g);
+  if (h.f) {
+    const [fx, fy] = P(h.f), [kx2, ky2] = P(h.b);
+    el("line", { class: "depth", x1: fx, y1: fy, x2: kx2, y2: ky2 }, g);
+  }
+  el("circle", { class: "pin", cx: gx, cy: gy, r: 2.5 }, g);
+  // Put the number just beyond the green, away from the tee.
+  const dx = gx - bx, dy = gy - by, d = Math.hypot(dx, dy) || 1;
+  const lx = Math.min(W - 10, Math.max(10, gx + (dx / d) * 16));
+  const ly = Math.min(H - 6, Math.max(14, gy + (dy / d) * 16 + 5));
+  el("text", { class: "hole-num", x: lx, y: ly, "text-anchor": "middle" }, g).textContent = h.n;
+  el("line", { class: "hole-hit", x1: bx, y1: by, x2: gx, y2: gy }, g);
+  g.addEventListener("click", () => select(h.n, true));
+  groups[h.n] = g;
+}
+
+// Tee colours as they appear on the tee markers.
+const TEE_COLOUR = { Black: "#1c1c1c", Blue: "#2f66c4", White: "#ffffff", Gold: "#d4a017", Red: "#c8362d", Silver: "#a9afb6", Green: "#2f8a4a" };
+const swatch = (c) => `<i class="sw" style="background:${TEE_COLOUR[c] || "transparent"}" title="${c}"></i>`;
+
+// Caddy advice, worked out ahead of time by the caddy package for each
+// skill level and tee colour.
+const SKILLS = ["beginner", "intermediate", "advanced", "expert"];
+const TEES = Object.keys(DATA.card);
+{
+  const totals = TEES.map((c) => `${c} ${DATA.card[c].reduce((a, b) => a + b, 0).toLocaleString("en-US")}`).join(" · ");
+  $("tee-note").innerHTML = `Tee colours come from <a href="${DATA.cardSource}">${DATA.cardSourceName}</a> (${totals} yd), which may not match the current card. ${TEES[0]} is placed on the rearmost mapped box and each other colour on the box whose distance forward best matches how much shorter it plays. Where fewer boxes are mapped than there are tee sets, colours share a box. Boxes with no dots don't match any colour.`;
+}
+const CLUB_NAME = { driver: "Driver", pw: "Pitching wedge", gw: "Gap wedge", sw: "Sand wedge", lw: "Lob wedge" };
+for (let n = 3; n <= 9; n++) CLUB_NAME[`${n}i`] = `${n} iron`;
+for (const n of [3, 5, 7]) CLUB_NAME[`${n}w`] = `${n} wood`;
+for (const n of [3, 4, 5]) CLUB_NAME[`${n}h`] = `${n} hybrid`;
+const PLAN = { target: "Straight at it", carry: "Carry it", front: "Front of green", layup: "Lay up", no_safe_club: "Risky" };
+const cap = (w) => w[0].toUpperCase() + w.slice(1);
+
+const pick = { skill: "intermediate", tee: DATA.defaultTee };
+try {
+  const saved = JSON.parse(localStorage.getItem("caddy-pick") || "{}");
+  if (SKILLS.includes(saved.skill)) pick.skill = saved.skill;
+  if (TEES.includes(saved.tee)) pick.tee = saved.tee;
+} catch {}
+
+function buildPicker(id, name, values, label) {
+  const box = $(id);
+  for (const v of values) {
+    const input = document.createElement("input");
+    input.type = "radio";
+    input.name = name;
+    input.id = `${name}-${v}`;
+    input.value = v;
+    input.checked = pick[name] === v;
+    input.addEventListener("change", () => {
+      pick[name] = v;
+      try { localStorage.setItem("caddy-pick", JSON.stringify(pick)); } catch {}
+      renderAdvice();
+    });
+    const lab = document.createElement("label");
+    lab.htmlFor = input.id;
+    lab.innerHTML = label(v);
+    box.append(input, lab);
+  }
+}
+
+function adviceFor(n) {
+  const [club, plan, reason, front, centre, back] = DATA.advice[n][pick.skill][pick.tee];
+  return { club, plan, reason, front, centre, back };
+}
+
+function renderAdvice() {
+  for (const h of holes) {
+    const a = adviceFor(h.n);
+    const box = $(`caddy-${h.n}`);
+    box.className = `caddy plan-${a.plan}`;
+    box.innerHTML = `
+      <div class="top"><span class="club">${CLUB_NAME[a.club] || a.club}</span><span class="plan ${a.plan}">${PLAN[a.plan]}</span>
+      <span class="yds">${swatch(pick.tee)}${pick.tee} tee · ${a.front} front · ${a.centre} centre · ${a.back} back</span></div>
+      <div class="why">${a.reason}</div>`;
+  }
+  if (current) select(current, false);
+}
+
+// Hazard lines: "Bunker, right   244–270" (reach–carry from the back tee).
+const KIND = { b: "Bunker", w: "Water", l: "Lateral water" };
+const SIDE = { l: "left", r: "right", c: "crossing" };
+function hazardList(h) {
+  if (!h.z.length) return '<div class="no-hazards">No bunkers or water mapped</div>';
+  const head = '<div class="hazards-head"><span>Hazards</span><span>Reach–carry yd</span></div>';
+  return `<div class="hazards">${head}${h.z.map(([i, side, reach, carry]) => {
+    const k = DATA.hazards[i].k;
+    return `<div class="hazard ${k}"><i></i><span class="what">${KIND[k]}, <span class="side">${SIDE[side]}</span></span><span class="yd"><b>${reach}</b>–<b>${carry}</b></span></div>`;
+  }).join("")}</div>`;
+}
+
+// Hole list.
+const list = $("holes");
+const rows = {};
+const fmt = (n) => n.toFixed(6);
+const nines = [["Front nine", holes.filter((h) => h.n <= 9)], ["Back nine", holes.filter((h) => h.n > 9)]];
+for (const [label, nine] of nines) {
+  const head = document.createElement("div");
+  head.className = "nine";
+  head.innerHTML = `<span>${label}</span><span>Par ${par(nine)}</span>`;
+  list.appendChild(head);
+  for (const h of nine) {
+    const row = document.createElement("div");
+    row.className = "hole-row";
+    row.tabIndex = 0;
+    row.id = `hole-${h.n}`;
+    row.innerHTML = `
+      <div class="num">${h.n}<small>PAR ${h.par ?? "?"}</small></div>
+      <div class="detail">
+        <div class="caddy" id="caddy-${h.n}"></div>
+        <div class="tees-head">Tees · centre, front–back yd</div>
+        <div class="tees">${h.t.map((t, i) => `<span class="tee${i === 0 ? " back" : ""}" title="${t[5].join(", ") || "No scorecard colour"}"><span class="swatches">${t[5].map(swatch).join("")}</span><span>${t[2]}<em>yd</em></span><span class="fb">${t[3]}–${t[4]}</span></span>`).join("")}</div>
+        <div class="card-line">Scorecard ${Object.entries(DATA.card).map(([c, ys]) => `<span>${swatch(c)}<b>${ys[h.n - 1]}</b></span>`).join("")}</div>
+        ${hazardList(h)}
+        <div class="coords">${[["Front", h.f], ["Centre", h.g], ["Back", h.b]].map(([label, c]) =>
+          `<span>${label}</span><code>${fmt(c[0])}, ${fmt(c[1])}</code><button class="copy" type="button">Copy</button>`).join("")}</div>
+        <div class="tee-list">${h.t.map((t, i) => `<span>Tee ${i + 1}: ${fmt(t[0])}, ${fmt(t[1])}</span>`).join("")}</div>
+      </div>`;
+    row.addEventListener("click", (e) => { if (!e.target.closest(".copy")) select(h.n, false); });
+    row.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(h.n, false); } });
+    row.querySelectorAll(".copy").forEach((btn) => {
+      const code = btn.previousElementSibling;
+      btn.addEventListener("click", () => {
+        const reset = (text) => { btn.textContent = text; setTimeout(() => (btn.textContent = "Copy"), 1500); };
+        const fallback = () => {
+          const sel = getSelection(), range = document.createRange();
+          range.selectNodeContents(code);
+          sel.removeAllRanges(); sel.addRange(range);
+          reset("Selected");
+        };
+        try { navigator.clipboard.writeText(code.textContent).then(() => reset("Copied"), fallback); } catch { fallback(); }
+      });
+    });
+    list.appendChild(row);
+    rows[h.n] = row;
+  }
+}
+
+let current = null;
+function select(n, fromMap) {
+  current = n;
+  for (const k in groups) {
+    const on = +k === n;
+    groups[k].classList.toggle("active", on);
+    rows[k].classList.toggle("active", on);
+  }
+  for (const k in fairwayEls) fairwayEls[k].forEach((e) => e.classList.toggle("on", +k === n));
+  hazardEls.forEach((e) => e.classList.remove("on"));
+  for (const [i] of holes.find((x) => x.n === n).z) hazardEls[i].classList.add("on");
+  // Draw the selected hole on top.
+  svg.appendChild(groups[n]);
+  const h = holes.find((x) => x.n === n);
+  const a = adviceFor(n);
+  $("map-status").textContent = `Hole ${n} · par ${h.par} · ${a.centre} yd from ${pick.tee} · ${CLUB_NAME[a.club] || a.club}`;
+  if (fromMap) {
+    const smooth = matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    rows[n].scrollIntoView({ behavior: smooth, block: "nearest" });
+  }
+}
+buildPicker("skill-picker", "skill", SKILLS, cap);
+buildPicker("tee-picker", "tee", TEES, (c) => `${swatch(c)}${c}`);
+renderAdvice();
+select(1, false);
+</script>

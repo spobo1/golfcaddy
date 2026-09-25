@@ -1,0 +1,23 @@
+{
+  "sterling-farms": {
+    "title": "Sterling Farms Yardage Book",
+    "query": "Sterling Farms Golf Course, Stamford, CT",
+    "scorecard": "scorecards/sterling_farms.json",
+    "place": "Stamford, Connecticut",
+    "default_tee": "White"
+  },
+  "spooky-brook": {
+    "title": "Spooky Brook Yardage Book",
+    "query": "Spooky Brook Golf Course, New Jersey",
+    "scorecard": "scorecards/spooky_brook.json",
+    "place": "Somerset, New Jersey",
+    "default_tee": "Blue"
+  },
+  "bunker-hill": {
+    "title": "Bunker Hill Yardage Book",
+    "query": "Bunker Hill Golf Course, New Jersey",
+    "scorecard": "scorecards/bunker_hill.json",
+    "place": "Princeton, New Jersey",
+    "default_tee": "White"
+  }
+}

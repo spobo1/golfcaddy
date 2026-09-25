@@ -178,3 +178,26 @@ python -m caddy "Sterling Farms Golf Course, Stamford, CT" --hole 17 --user ann 
   to the player's bag.
 - Distances are straight lines. Wind, elevation and lie aren't taken into
   account.
+
+## yardagebook
+
+Builds a course's yardage book and caddy page: a single HTML page with a map
+of every hole (aerial photo or drawn plan), fairways, bunkers and water, tee
+yardages to the front, centre and back of each green by tee colour, and caddy
+club suggestions for each skill level and tee.
+
+```sh
+python -m yardagebook sterling-farms      # one course
+python -m yardagebook --all               # every course in yardagebook/courses.json
+```
+
+Pages are written to `build/` (not committed), each with its aerial photo
+alongside (`build/<course>-aerial.jpg`); the page expects the photo next to it.
+To add a course, add its scorecard to `scorecards/` and an entry to
+`yardagebook/courses.json` (search name, scorecard, place, default tee).
+
+- **Aerial photos** come from the USGS National Map (USDA NAIP, public domain,
+  US only), downloaded at build time at about 1 m per pixel and lined up with
+  the map using the extent the service reports. `--no-aerial` skips it.
+- **Caddy advice** is worked out ahead of time with `caddy` for every hole,
+  tee colour and skill level, using typical distances for that level.
