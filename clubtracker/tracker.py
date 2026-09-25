@@ -6,7 +6,15 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Iterable, Optional
 
-from .clubs import CLUBS, DEFAULT_SKILL_LEVEL, normalize_club, normalize_skill_level, roll_fraction, typical_carry_yd
+from .clubs import (
+    CLUBS,
+    DEFAULT_SKILL_LEVEL,
+    normalize_club,
+    normalize_skill_level,
+    normalize_strike,
+    roll_fraction,
+    typical_carry_yd,
+)
 from .models import ClubDistance, ClubStats, ClubSuggestion, LaunchData, Shot
 
 _LAUNCH = LaunchData.names()
@@ -23,12 +31,17 @@ CREATE TABLE IF NOT EXISTS shots (
     recorded_at TEXT NOT NULL,
     carry_yd REAL,
     total_yd REAL,
-    {", ".join(f"{name} REAL" for name in _LAUNCH)}
+    {", ".join(f"{name} REAL" for name in _LAUNCH)},
+    strike TEXT,
+    source_id TEXT
 );
 CREATE INDEX IF NOT EXISTS shots_by_user_club ON shots (user_id, club);
 """
 
-_SHOT_COLUMNS = ["id", "user_id", "club", "recorded_at", "carry_yd", "total_yd", *_LAUNCH]
+# Columns added after the first version, for databases created before them.
+_ADDED_COLUMNS = {"strike": "TEXT", "source_id": "TEXT"}
+
+_SHOT_COLUMNS = ["id", "user_id", "club", "recorded_at", "carry_yd", "total_yd", *_LAUNCH, "strike"]
 
 
 class ClubTracker:
@@ -40,6 +53,16 @@ class ClubTracker:
     def __init__(self, db_path: str = ":memory:"):
         self._db = sqlite3.connect(db_path)
         self._db.executescript(_SCHEMA)
+        existing = {row[1] for row in self._db.execute("PRAGMA table_info(shots)")}
+        with self._db:
+            for name, kind in _ADDED_COLUMNS.items():
+                if name not in existing:
+                    self._db.execute(f"ALTER TABLE shots ADD COLUMN {name} {kind}")
+            # Lets an imported file be imported again without duplicating shots.
+            self._db.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS shots_by_source ON shots (user_id, source_id) "
+                "WHERE source_id IS NOT NULL"
+            )
 
     def close(self) -> None:
         self._db.close()
@@ -71,11 +94,16 @@ class ClubTracker:
         total_yd: Optional[float] = None,
         launch: Optional[LaunchData] = None,
         recorded_at: Optional[datetime] = None,
+        strike: Optional[str] = None,
+        source_id: Optional[str] = None,
     ) -> Shot:
         """Save a shot. Needs a carry, a total distance, or both.
 
-        ``recorded_at`` defaults to now; a time without a time zone is taken
-        as local time. Times are stored in UTC.
+        ``strike`` is "good", "ok" or "mishit"; mishits stay in the history
+        but are left out of averages. ``recorded_at`` defaults to now; a time
+        without a time zone is taken as local time. Times are stored in UTC.
+        ``source_id`` identifies a shot from an imported file (see
+        ``import_range_csv``).
         """
         if carry_yd is None and total_yd is None:
             raise ValueError("A shot needs a carry_yd, a total_yd, or both")
@@ -90,16 +118,24 @@ class ClubTracker:
             carry_yd=carry_yd,
             total_yd=total_yd,
             launch=launch or LaunchData(),
+            strike=normalize_strike(strike) if strike is not None else None,
         )
         values = [shot.user_id, shot.club, shot.recorded_at.isoformat(), carry_yd, total_yd]
         values += [getattr(shot.launch, name) for name in _LAUNCH]
+        values += [shot.strike, source_id]
         with self._db:
             cursor = self._db.execute(
-                f"INSERT INTO shots ({', '.join(_SHOT_COLUMNS[1:])}) VALUES ({', '.join('?' * len(values))})",
+                f"INSERT INTO shots ({', '.join(_SHOT_COLUMNS[1:])}, source_id) VALUES ({', '.join('?' * len(values))})",
                 values,
             )
         shot.id = cursor.lastrowid
         return shot
+
+    def import_range_csv(self, user_id: str, path: str):
+        """Add shots from a range-practice CSV (see clubtracker.rangecsv). Safe to repeat."""
+        from .rangecsv import import_range_csv
+
+        return import_range_csv(self, user_id, path)
 
     def delete_shot(self, shot_id: int) -> bool:
         """Remove a shot, e.g. one entered by mistake. Returns whether it existed."""
@@ -122,12 +158,15 @@ class ClubTracker:
     # Distances
 
     def club_averages(self, user_id: str) -> dict[str, ClubStats]:
-        """Averages for every club the player has hit, in bag order."""
+        """Averages for every club the player has hit, in bag order, leaving out mishits."""
         rows = self._db.execute(
             f"SELECT club, COUNT(*), AVG(carry_yd), AVG(total_yd), {', '.join(f'AVG({n})' for n in _LAUNCH)} "
-            "FROM shots WHERE user_id = ? GROUP BY club",
+            "FROM shots WHERE user_id = ? AND (strike IS NULL OR strike != 'mishit') GROUP BY club",
             (user_id,),
         ).fetchall()
+        mishits = dict(self._db.execute(
+            "SELECT club, COUNT(*) FROM shots WHERE user_id = ? AND strike = 'mishit' GROUP BY club", (user_id,)
+        ).fetchall())
         stats = {
             row[0]: ClubStats(
                 club=row[0],
@@ -135,6 +174,7 @@ class ClubTracker:
                 carry_yd=_round(row[2]),
                 total_yd=_round(row[3]),
                 launch=LaunchData(**{name: _round(v) for name, v in zip(_LAUNCH, row[4:])}),
+                mishits=mishits.get(row[0], 0),
             )
             for row in rows
         }
@@ -221,6 +261,7 @@ def _shot_from_row(row) -> Shot:
         carry_yd=values["carry_yd"],
         total_yd=values["total_yd"],
         launch=LaunchData(**{name: values[name] for name in _LAUNCH}),
+        strike=values["strike"],
     )
 
 
